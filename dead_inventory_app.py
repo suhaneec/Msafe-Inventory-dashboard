@@ -48,10 +48,20 @@ def parse_vsoft_file(file_bytes, filename):
     Rows 2..N-2: data items
     Last 2 rows: totals row + location label row
     """
-    try:
-        df_raw = pd.read_excel(io.BytesIO(file_bytes), header=None, sheet_name=0)
-    except Exception as e:
-        return None, None, str(e)
+    df_raw = None
+    last_err = None
+    for engine in [None, "openpyxl", "xlrd"]:
+        try:
+            kwargs = {"header": None, "sheet_name": 0}
+            if engine:
+                kwargs["engine"] = engine
+            df_raw = pd.read_excel(io.BytesIO(file_bytes), **kwargs)
+            break
+        except Exception as e:
+            last_err = e
+            continue
+    if df_raw is None:
+        return None, None, str(last_err)
 
     # Extract location — scan from bottom up
     location = filename.replace(".xlsx","").replace(".xls","")  # fallback = filename
