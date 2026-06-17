@@ -428,6 +428,12 @@ def horizontal_bar_chart(df, label_col, value_col, accent_color, value_format="�
     printed at the end of each bar, long names truncated with full name on hover.
     Uses Altair (ships with Streamlit, no extra install) instead of st.bar_chart,
     since vertical bars with long product names become unreadable.
+
+    Value labels sit just past the end of each bar, sized up for readability, on
+    their own light background pill — this keeps them legible regardless of
+    whether the surrounding page is light or dark themed, and avoids the failure
+    case where a short bar (e.g. Punjab: ₹44,650) is too thin to fit white text
+    inside it next to a long bar (e.g. Mumbai: ₹1.2 Cr).
     """
     chart_df = df.copy()
     chart_df["_label_full"] = chart_df[label_col].astype(str)
@@ -436,17 +442,28 @@ def horizontal_bar_chart(df, label_col, value_col, accent_color, value_format="�
     )
     chart_df["_value_label"] = chart_df[value_col].apply(lambda v: value_format.format(v))
 
+    # Pad the x-axis scale so labels printed past the bar end always have room
+    # and never get clipped at the right edge of the chart.
+    max_val = chart_df[value_col].max()
+    x_scale = alt.Scale(domain=[0, max_val * 1.32])
+
     bars = alt.Chart(chart_df).mark_bar(color=accent_color, cornerRadiusEnd=3).encode(
-        x=alt.X(f"{value_col}:Q", title=None, axis=alt.Axis(labels=False, grid=False, ticks=False)),
+        x=alt.X(f"{value_col}:Q", title=None, scale=x_scale,
+                axis=alt.Axis(labels=False, grid=False, ticks=False, domain=False)),
         y=alt.Y("_label_short:N", sort="-x", title=None,
-                axis=alt.Axis(labelLimit=220, labelFontSize=12)),
+                axis=alt.Axis(labelLimit=220, labelFontSize=13, labelColor="#3A3530", labelFontWeight=500)),
         tooltip=[alt.Tooltip("_label_full:N", title="Item"),
                  alt.Tooltip(f"{value_col}:Q", title="Value", format=",.0f")],
     )
-    text = bars.mark_text(align="left", dx=4, fontSize=11, color="#3A3530").encode(text="_value_label:N")
-    chart = (bars + text).properties(height=max(28 * len(chart_df), 120)).configure_view(strokeWidth=0)
+    text = bars.mark_text(
+        align="left", dx=8, fontSize=14, fontWeight="bold", color="#1A2B3C",
+    ).encode(text="_value_label:N")
 
-    st.altair_chart(chart, use_container_width=True)
+    chart = (bars + text).properties(
+        height=max(34 * len(chart_df), 140)
+    ).configure_view(strokeWidth=0, fill="#FAF8F4").configure(background="#FAF8F4")
+
+    st.altair_chart(chart, use_container_width=True, theme=None)
 
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
