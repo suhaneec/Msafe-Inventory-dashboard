@@ -709,8 +709,10 @@ with tab3:
     view_df["Value"] = view_df["Idle Value"].apply(lambda x: f"₹{x:,.0f}")
 
     st.dataframe(
-        view_df[["RAG", "Location", "Item Code", "Item Name", "Age Bucket", "Idle Qty", "Value"]].rename(
-            columns={"Location": "Yard", "Idle Qty": "Qty"}
-        ).sort_values(["Location", "RAG"]).reset_index(drop=True),
+        view_df[["RAG", "Location", "Item Code", "Item Name", "Age Bucket", "Idle Qty", "Value", "Age Rank"]]
+        .sort_values(["Location", "Age Rank"], ascending=[True, False])
+        .drop(columns=["Age Rank"])
+        .rename(columns={"Location": "Yard", "Idle Qty": "Qty"})
+        .reset_index(drop=True),
         use_container_width=True, hide_index=True
     )
