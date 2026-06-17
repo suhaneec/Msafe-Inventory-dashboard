@@ -534,60 +534,130 @@ RAG_COLOR = {"0–60 days": "🟢", "60–120 days": "🟡", "120–180 days": "
 
 
 # ── Tabs ────────────────────────────────────────────────────────────────────────
-tab0, tab1, tab2, tab3 = st.tabs([
-    "📊 Director Summary", "🏭 By Yard", "🔁 Repeat Offenders", "📋 Full Detail"
+tab0, tab1, tab2 = st.tabs([
+    "📊 Director Summary", "🏭 By Yard", "🔁 Repeat Offenders"
 ])
 
 
 # ══════════════════════════════════════════════
-# TAB 0 — Director Summary (charts + top offenders)
+# TAB 0 — Director Summary (split by age band)
 # ══════════════════════════════════════════════
 with tab0:
-    st.markdown('<div class="sec-title">Where is the money stuck?</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Value of dead stock by yard — worst yards first</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-title">Dead stock, split by how long it has been sitting</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">Two age bands below — each shows which yard is worst, and which product is worst, by units and by value</div>', unsafe_allow_html=True)
 
-    yard_chart_data = dead_v.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
-    if len(yard_chart_data) > 0:
-        chart_df = yard_chart_data.reset_index()
-        chart_df.columns = ["Yard", "Dead Stock Value"]
-        st.bar_chart(chart_df.set_index("Yard"), use_container_width=True, color="#B5562B")
-    else:
-        st.info(f"No items are idle {threshold_days}+ days at the current threshold.")
+    def render_age_band_section(band_df, band_label, band_key, accent_color):
+        """Renders: yard chart+table, then product chart+table, both units & value, high to low."""
+        st.markdown(f'<div class="sec-title">{band_label}</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="sec-title">How old is the problem?</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Value of ALL non-moving stock, split by how long it has been sitting</div>', unsafe_allow_html=True)
+        if len(band_df) == 0:
+            st.info(f"No items fall in the {band_label.lower()} band.")
+            return
 
-    age_order = ["0–60 days", "60–120 days", "120–180 days", "180+ days"]
-    age_chart_data = master_v.groupby("Age Bucket")["Idle Value"].sum().reindex(age_order).fillna(0)
-    age_chart_df = age_chart_data.reset_index()
-    age_chart_df.columns = ["Age", "Value"]
-    st.bar_chart(age_chart_df.set_index("Age"), use_container_width=True, color="#C8923A")
+        band_qty   = int(band_df["Idle Qty"].sum())
+        band_value = band_df["Idle Value"].sum()
+        st.markdown(f"""
+        <div class="kpi-row" style="margin-bottom:1.1rem;">
+          <div class="kpi">
+            <div class="lbl">Items in this band</div>
+            <div class="val">{len(band_df)}</div>
+            <div class="sub">{band_qty:,} units</div>
+          </div>
+          <div class="kpi">
+            <div class="lbl">Value locked up</div>
+            <div class="val">₹{band_value/100000:.1f}L</div>
+            <div class="sub">in this age band alone</div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    if dead_skus > 0:
-        st.markdown('<div class="sec-title">Top 15 single biggest write-off candidates</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sec-sub">The individual items locking up the most capital, worst first</div>', unsafe_allow_html=True)
+        # ── Yard-wise: units and value, both high to low ───────────────────────
+        st.markdown(f'<div class="sec-sub" style="margin-top:0.4rem;"><b>Which yard has the most dead inventory</b></div>', unsafe_allow_html=True)
 
-        top15 = dead_v.sort_values(["Age Rank", "Idle Value"], ascending=[False, False]).head(15).copy()
-        top15["RAG"] = top15["Age Bucket"].map(RAG_COLOR)
-        top15["Value"] = top15["Idle Value"].apply(lambda x: f"₹{x:,.0f}")
-        top15_disp = top15[["RAG", "Item Code", "Item Name", "Location", "Age Bucket", "Idle Qty", "Value"]].rename(
-            columns={"Idle Qty": "Qty", "Location": "Yard"}
+        yard_units = band_df.groupby("Location")["Idle Qty"].sum().sort_values(ascending=False)
+        yard_value = band_df.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
+
+        yc1, yc2 = st.columns(2)
+        with yc1:
+            st.caption("By units — highest first")
+            chart1 = yard_units.reset_index()
+            chart1.columns = ["Yard", "Units"]
+            st.bar_chart(chart1.set_index("Yard"), use_container_width=True, color=accent_color)
+        with yc2:
+            st.caption("By value (₹) — highest first")
+            chart2 = yard_value.reset_index()
+            chart2.columns = ["Yard", "Value"]
+            st.bar_chart(chart2.set_index("Yard"), use_container_width=True, color=accent_color)
+
+        yard_table = pd.DataFrame({
+            "Yard": yard_value.index,
+            "Value ₹": yard_value.values,
+        }).merge(
+            pd.DataFrame({"Yard": yard_units.index, "Units": yard_units.values}),
+            on="Yard"
+        ).sort_values("Value ₹", ascending=False)
+        yard_table["Value ₹"] = yard_table["Value ₹"].apply(lambda x: f"₹{x:,.0f}")
+        yard_table["Units"] = yard_table["Units"].astype(int)
+        yard_table.insert(0, "Rank", range(1, len(yard_table) + 1))
+
+        st.dataframe(yard_table[["Rank", "Yard", "Units", "Value ₹"]], use_container_width=True, hide_index=True)
+
+        # ── Product-wise: units and value, both high to low ────────────────────
+        st.markdown(f'<div class="sec-sub" style="margin-top:1rem;"><b>Which product is dead the most</b></div>', unsafe_allow_html=True)
+
+        prod_grp = band_df.groupby(["Item Code", "Item Name"]).agg(
+            Units=("Idle Qty", "sum"),
+            Value=("Idle Value", "sum"),
+            Yards=("Location", "nunique"),
+        ).reset_index()
+
+        prod_units_top = prod_grp.sort_values("Units", ascending=False).head(10)
+        prod_value_top = prod_grp.sort_values("Value", ascending=False).head(10)
+
+        pc1, pc2 = st.columns(2)
+        with pc1:
+            st.caption("Top 10 by units — highest first")
+            chart3 = prod_units_top[["Item Name", "Units"]].set_index("Item Name")
+            st.bar_chart(chart3, use_container_width=True, color=accent_color)
+        with pc2:
+            st.caption("Top 10 by value (₹) — highest first")
+            chart4 = prod_value_top[["Item Name", "Value"]].set_index("Item Name")
+            st.bar_chart(chart4, use_container_width=True, color=accent_color)
+
+        prod_table = prod_grp.sort_values("Value", ascending=False).head(20).copy()
+        prod_table["Value ₹"] = prod_table["Value"].apply(lambda x: f"₹{x:,.0f}")
+        prod_table["Units"] = prod_table["Units"].astype(int)
+        prod_table.insert(0, "Rank", range(1, len(prod_table) + 1))
+
+        st.dataframe(
+            prod_table[["Rank", "Item Code", "Item Name", "Yards", "Units", "Value ₹"]].rename(
+                columns={"Yards": "# Yards Affected"}
+            ),
+            use_container_width=True, hide_index=True
         )
-        st.dataframe(top15_disp, use_container_width=True, hide_index=True)
 
-        # Download
+        # ── Download for this band ──────────────────────────────────────────────
         export_sheets = {
-            "Top 15 Items": df_to_rows(
-                top15[["Item Code","Item Name","Location","Age Bucket","Idle Qty","Idle Value"]]
+            f"{band_key} - By Yard": df_to_rows(yard_table[["Rank", "Yard", "Units", "Value ₹"]]),
+            f"{band_key} - By Product": df_to_rows(
+                prod_table[["Rank", "Item Code", "Item Name", "Yards", "Units", "Value ₹"]]
             ),
         }
         buf = write_xlsx_stdlib(export_sheets)
         st.download_button(
-            "⬇️  Download this summary (.xlsx)",
+            f"⬇️  Download {band_label} report (.xlsx)",
             data=buf,
-            file_name=f"MSafe_DeadStock_Summary_{date.today()}.xlsx",
+            file_name=f"MSafe_{band_key}_{date.today()}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"download_{band_key}",
         )
+
+    band_120_180 = master_v[master_v["Age Bucket"] == "120–180 days"].copy()
+    band_180_plus = master_v[master_v["Age Bucket"] == "180+ days"].copy()
+
+    render_age_band_section(band_120_180, "🟠 120–180 Days — Needs Action", "120-180days", "#C8923A")
+    st.markdown("<hr style='margin:2rem 0; border-color:#E5E0D8;'>", unsafe_allow_html=True)
+    render_age_band_section(band_180_plus, "🔴 180+ Days — Dead Stock", "180plusdays", "#B5562B")
 
 
 # ══════════════════════════════════════════════
@@ -684,35 +754,3 @@ with tab2:
 
 
 # ══════════════════════════════════════════════
-# TAB 3 — Full Detail
-# ══════════════════════════════════════════════
-with tab3:
-    st.markdown('<div class="sec-title">Every non-moving item</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Search or filter to find a specific item or yard</div>', unsafe_allow_html=True)
-
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        search = st.text_input("Search item name or code", placeholder="e.g. Prop jack, Scissor lift…")
-    with c2:
-        age_filter = st.selectbox("Age bucket", ["All"] + age_order)
-
-    view_df = master_v.copy()
-    if search:
-        mask = (view_df["Item Name"].str.contains(search, case=False, na=False) |
-                view_df["Item Code"].str.contains(search, case=False, na=False))
-        view_df = view_df[mask]
-    if age_filter != "All":
-        view_df = view_df[view_df["Age Bucket"] == age_filter]
-
-    view_df = view_df.copy()
-    view_df["RAG"] = view_df["Age Bucket"].map(RAG_COLOR)
-    view_df["Value"] = view_df["Idle Value"].apply(lambda x: f"₹{x:,.0f}")
-
-    st.dataframe(
-        view_df[["RAG", "Location", "Item Code", "Item Name", "Age Bucket", "Idle Qty", "Value", "Age Rank"]]
-        .sort_values(["Location", "Age Rank"], ascending=[True, False])
-        .drop(columns=["Age Rank"])
-        .rename(columns={"Location": "Yard", "Idle Qty": "Qty"})
-        .reset_index(drop=True),
-        use_container_width=True, hide_index=True
-    )
