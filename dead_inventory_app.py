@@ -12,6 +12,54 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500..700&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap');
 
+/* ══════════════════════════════════════════════════════════════════
+   FORCE THE WHOLE APP TO A FIXED LIGHT THEME — independent of any
+   Streamlit Cloud theme setting, browser dark mode, or system
+   preference. Every rule below targets Streamlit's actual root
+   containers directly with !important, so this dashboard cannot
+   end up dark-background-with-dark-text no matter where it's hosted.
+   ══════════════════════════════════════════════════════════════════ */
+html, body { background-color: #FFFFFF !important; }
+
+[data-testid="stAppViewContainer"],
+[data-testid="stApp"],
+[data-testid="stMain"],
+.stApp {
+    background-color: #FFFFFF !important;
+    color: #1A2B3C !important;
+}
+
+[data-testid="stHeader"] { background-color: transparent !important; }
+
+/* Every generic text-bearing element in the main content area defaults
+   to dark text on the white background above, unless a specific rule
+   below (KPI cards, banner, sidebar, etc.) overrides it intentionally. */
+[data-testid="stMain"] p,
+[data-testid="stMain"] span,
+[data-testid="stMain"] div,
+[data-testid="stMain"] label,
+[data-testid="stMain"] li,
+[data-testid="stMain"] h1,
+[data-testid="stMain"] h2,
+[data-testid="stMain"] h3,
+[data-testid="stMain"] h4 {
+    color: #1A2B3C;
+}
+
+/* Streamlit's native widgets (selectbox, multiselect, text input, etc.)
+   in the main area — force light surfaces so dropdowns/inputs never
+   render as dark-on-dark either. */
+[data-testid="stMain"] [data-baseweb="select"] > div,
+[data-testid="stMain"] input,
+[data-testid="stMain"] textarea {
+    background-color: #FFFFFF !important;
+    color: #1A2B3C !important;
+    border-color: #E5E0D8 !important;
+}
+
+/* Dataframes / tables */
+[data-testid="stDataFrame"] { background-color: #FFFFFF !important; }
+
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 header[data-testid="stHeader"] { display: none; }
 .block-container { padding-top: 1.4rem; max-width: 1200px; }
@@ -24,16 +72,19 @@ header[data-testid="stHeader"] { display: none; }
     border-radius: 10px;
     margin-bottom: 1.6rem;
 }
-.banner h1 {
+.banner-title {
     font-family: 'Fraunces', serif;
     font-size: 1.6rem;
     font-weight: 600;
     margin: 0 0 4px 0;
+    color: #fff !important;
+    line-height: 1.3;
 }
 .banner .sub {
     font-size: 0.85rem;
     opacity: 0.65;
     font-weight: 400;
+    color: #fff !important;
 }
 
 /* ── Plain-language explainer strip ───────────────────────── */
@@ -43,11 +94,11 @@ header[data-testid="stHeader"] { display: none; }
     padding: 1rem 1.4rem;
     margin-bottom: 1.4rem;
     font-size: 0.88rem;
-    color: #3A3530;
+    color: #3A3530 !important;
     line-height: 1.55;
     border-left: 4px solid #B5562B;
 }
-.explain-box b { color: #1A2B3C; }
+.explain-box b { color: #1A2B3C !important; }
 
 /* ── KPI cards ─────────────────────────────────────────────── */
 .kpi-row { display: flex; gap: 1rem; margin-bottom: 1.6rem; flex-wrap: wrap; }
@@ -65,20 +116,20 @@ header[data-testid="stHeader"] { display: none; }
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #8A8378;
+    color: #8A8378 !important;
     margin-bottom: 6px;
 }
-.kpi .val { font-family: 'Fraunces', serif; font-size: 1.9rem; font-weight: 600; color: #1A2B3C; line-height: 1; }
-.kpi .sub { font-size: 0.76rem; color: #9B9488; margin-top: 5px; }
-.kpi.danger .val { color: #B5562B; }
-.kpi.warn .val { color: #C8923A; }
+.kpi .val { font-family: 'Fraunces', serif; font-size: 1.9rem; font-weight: 600; color: #1A2B3C !important; line-height: 1; }
+.kpi .sub { font-size: 0.76rem; color: #9B9488 !important; margin-top: 5px; }
+.kpi.danger .val { color: #B5562B !important; }
+.kpi.warn .val { color: #C8923A !important; }
 
 /* ── Section headers ───────────────────────────────────────── */
 .sec-title {
     font-family: 'Fraunces', serif;
     font-size: 1.15rem;
     font-weight: 600;
-    color: #1A2B3C;
+    color: #1A2B3C !important;
     background: #F4F1EA;
     padding: 0.55rem 1rem;
     border-radius: 8px;
@@ -86,14 +137,14 @@ header[data-testid="stHeader"] { display: none; }
 }
 .sec-sub {
     font-size: 0.82rem;
-    color: #6B6458;
+    color: #6B6458 !important;
     margin-bottom: 0.9rem;
 }
 .chart-heading {
     font-family: 'Fraunces', serif;
     font-size: 1.05rem;
     font-weight: 700;
-    color: #1A2B3C;
+    color: #1A2B3C !important;
     margin: 1.3rem 0 0.7rem 0;
 }
 
@@ -104,10 +155,10 @@ header[data-testid="stHeader"] { display: none; }
     padding: 5px 12px; border-radius: 20px;
     font-size: 0.76rem; font-weight: 600;
 }
-.chip.c-green  { background: #E3EFE3; color: #2D6A2D; }
-.chip.c-yellow { background: #FBF0DA; color: #9A6B12; }
-.chip.c-orange { background: #FCE4D4; color: #B5562B; }
-.chip.c-red    { background: #F8D7D7; color: #B02A2A; }
+.chip.c-green  { background: #E3EFE3; color: #2D6A2D !important; }
+.chip.c-yellow { background: #FBF0DA; color: #9A6B12 !important; }
+.chip.c-orange { background: #FCE4D4; color: #B5562B !important; }
+.chip.c-red    { background: #F8D7D7; color: #B02A2A !important; }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .dot.c-green  { background: #4C9A4C; }
 .dot.c-yellow { background: #D9A536; }
@@ -117,26 +168,33 @@ header[data-testid="stHeader"] { display: none; }
 /* ── Alert / callout box ──────────────────────────────────── */
 .alert-box {
     background: #FCE9E3; border-left: 4px solid #B5562B; border-radius: 0 8px 8px 0;
-    padding: 0.85rem 1.1rem; font-size: 0.85rem; color: #6B3119; margin-bottom: 1rem;
+    padding: 0.85rem 1.1rem; font-size: 0.85rem; color: #6B3119 !important; margin-bottom: 1rem;
 }
 
 /* ── Sidebar ───────────────────────────────────────────────── */
-section[data-testid="stSidebar"] { background: #1A2B3C; }
+section[data-testid="stSidebar"] { background: #1A2B3C !important; }
 section[data-testid="stSidebar"] * { color: #C7CDD3 !important; }
 section[data-testid="stSidebar"] h2 { color: #fff !important; font-family: 'Fraunces', serif; font-size: 1rem; }
+section[data-testid="stSidebar"] [data-baseweb="select"] > div,
+section[data-testid="stSidebar"] input {
+    background-color: #243648 !important;
+    color: #fff !important;
+}
 
 /* Tabs */
 .stTabs [data-baseweb="tab-list"] { gap: 4px; background: transparent; }
 .stTabs [data-baseweb="tab"] {
-    font-weight: 600; font-size: 0.88rem; color: #6B6458;
+    font-weight: 600; font-size: 0.88rem; color: #6B6458 !important;
     background: #F4F1EA; border-radius: 8px 8px 0 0; padding: 0.5rem 1rem;
 }
 .stTabs [aria-selected="true"] {
     color: #1A2B3C !important; background: #fff !important;
     border-bottom: 3px solid #B5562B !important;
 }
+.stTabs [data-baseweb="tab"] p { color: inherit !important; }
 </style>
 """, unsafe_allow_html=True)
+
 
 
 # ── Pure stdlib xlsx reader (no openpyxl / xlrd needed for reading) ───────────
@@ -500,7 +558,7 @@ dead_rank_cutoff = 3
 # ── Banner ─────────────────────────────────────────────────────────────────────
 st.markdown(f"""
 <div class="banner">
-  <h1>🏗️ Non-Moving Stock Report</h1>
+  <div class="banner-title">🏗️ Non-Moving Stock Report</div>
   <div class="sub">Equipment sitting unused across all yards · As of {date.today().strftime('%d %B %Y')}</div>
 </div>
 """, unsafe_allow_html=True)
