@@ -508,9 +508,11 @@ def horizontal_bar_chart(df, label_col, value_col, accent_color, value_format="â
     chart_df["_value_label"] = chart_df[value_col].apply(lambda v: value_format.format(v))
 
     # Pad the x-axis scale so labels printed past the bar end always have room
-    # and never get clipped at the right edge of the chart.
+    # and never get clipped at the right edge of the chart. Padding is generous
+    # (45%) because this chart often renders inside a narrower half-width column
+    # (side-by-side units/value layout), where clipping is more likely.
     max_val = chart_df[value_col].max()
-    x_scale = alt.Scale(domain=[0, max_val * 1.35])
+    x_scale = alt.Scale(domain=[0, max_val * 1.45])
 
     # Widest label in this chart determines how much left-side room to reserve â€”
     # long product names (up to ~70 characters) need real width, not a fixed cap.
@@ -530,9 +532,15 @@ def horizontal_bar_chart(df, label_col, value_col, accent_color, value_format="â
         align="left", dx=8, fontSize=14, fontWeight="bold", color="#1A2B3C",
     ).encode(text="_value_label:N")
 
+    # width="container" tells Vega-Lite itself to fill its parent's actual pixel
+    # width before computing the scale/layout â€” this is the setting Altair needs
+    # so the chart's internal coordinates match what Streamlit stretches it to.
+    # clip=False + a few pixels of padding stop the very top bar's value label
+    # (which sits flush against the chart's top edge) from being cut off â€” this
+    # was happening specifically to row 1 in narrow side-by-side columns.
     chart = (bars + text).properties(
-        height=max(34 * len(chart_df), 140)
-    ).configure_view(strokeWidth=0, fill="#FAF8F4").configure(background="#FAF8F4")
+        height=max(34 * len(chart_df), 140), width="container", padding={"top": 6, "right": 12, "bottom": 4, "left": 4}
+    ).configure_view(strokeWidth=0, fill="#FAF8F4", clip=False).configure(background="#FAF8F4")
 
     st.altair_chart(chart, width="stretch", theme=None)
 
