@@ -89,6 +89,13 @@ header[data-testid="stHeader"] { display: none; }
     color: #6B6458;
     margin-bottom: 0.9rem;
 }
+.chart-heading {
+    font-family: 'Fraunces', serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1A2B3C;
+    margin: 1.3rem 0 0.7rem 0;
+}
 
 /* ── Severity legend chips ─────────────────────────────────── */
 .legend-row { display: flex; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; }
@@ -647,7 +654,7 @@ with tab0:
         """, unsafe_allow_html=True)
 
         # ── Yard-wise: units and value, both high to low ───────────────────────
-        st.markdown(f'<div class="sec-sub" style="margin-top:0.4rem;"><b>Which yard has the most dead inventory</b></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="chart-heading">Which yard has the most dead inventory</div>', unsafe_allow_html=True)
 
         yard_units = band_df.groupby("Location")["Idle Qty"].sum().sort_values(ascending=False)
         yard_value = band_df.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
@@ -678,7 +685,7 @@ with tab0:
         st.dataframe(yard_table[["Rank", "Yard", "Units", "Value ₹"]], width="stretch", hide_index=True)
 
         # ── Product-wise: units and value, both high to low ────────────────────
-        st.markdown(f'<div class="sec-sub" style="margin-top:1rem;"><b>Which product is dead the most</b></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="chart-heading">Which product is dead the most</div>', unsafe_allow_html=True)
 
         prod_grp = band_df.groupby(["Item Code", "Item Name"]).agg(
             Units=("Idle Qty", "sum"),
