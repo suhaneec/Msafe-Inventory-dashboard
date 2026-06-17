@@ -51,7 +51,9 @@ def _col_index(ref):
 
 
 def _read_sheet_rows(z, sheet_path, shared):
-    """Read all rows of one worksheet XML into a list of value-lists."""
+    """Read all rows of one worksheet XML into a list of value-lists.
+    Each row list is sized to the row's own max column — NOT truncated,
+    so labels sitting far to the right (e.g. column L or N) are preserved."""
     with z.open(sheet_path) as f:
         tree = ET.parse(f)
     rows = []
@@ -91,7 +93,6 @@ def get_workbook_sheets(file_bytes):
     with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
         names = z.namelist()
 
-        # Shared strings table
         shared = []
         if "xl/sharedStrings.xml" in names:
             with z.open("xl/sharedStrings.xml") as f:
@@ -100,7 +101,6 @@ def get_workbook_sheets(file_bytes):
                     parts = [t.text or "" for t in si.findall(f".//{{{NS}}}t")]
                     shared.append("".join(parts))
 
-        # Map rId -> sheet file path
         rid_to_path = {}
         if "xl/_rels/workbook.xml.rels" in names:
             with z.open("xl/_rels/workbook.xml.rels") as f:
@@ -110,7 +110,6 @@ def get_workbook_sheets(file_bytes):
                     if target.startswith("worksheets/"):
                         rid_to_path[rel.get("Id")] = "xl/" + target
 
-        # Map sheet name -> rId (preserves left-to-right tab order)
         sheet_order = []
         with z.open("xl/workbook.xml") as f:
             tree = ET.parse(f)
@@ -138,46 +137,88 @@ def to_num(v):
         return 0.0
 
 
-def parse_location_sheet(rows, location_name):
+def extract_full_location_name(header_row, tab_name):
+    """
+    The full godown/location name is written as a text label somewhere in row 1
+    (often column L or N — well to the right of the data columns), e.g.
+    'LOCATION _ NOIDA FACTORY 2 NF' or 'GODOWN_BANGLORE'.
+    We scan the ENTIRE header row for a cell matching that pattern and clean it up.
+    Column A is intentionally skipped — on at least one real sheet it contained a
+    stray/incorrect label, while the correct one was further right.
+    Falls back to the sheet tab name if nothing is found.
+    """
+    best = None
+    for i, cell in enumerate(header_row):
+        if i == 0:
+            continue  # skip column A — can contain stray mislabeled text
+        if cell and isinstance(cell, str):
+            up = cell.upper()
+            if any(k in up for k in ["LOCATION", "GODOWN", "FACTORY", "YARD", "DEPOT"]):
+                clean = cell
+                for s in ["LOCATION _", "LOCATION_", "LOCATION", "GODOWN_", "GODOWN _", "GODOWN"]:
+                    clean = clean.replace(s, "").replace(s.lower(), "")
+                clean = clean.strip(" _:-")
+                if clean:
+                    best = clean
+                    break  # first match scanning left-to-right after column A
+    return best if best else tab_name.strip()
+
+
+def parse_location_sheet(rows, tab_name):
     """
     Parse one location's row-data into a dataframe.
-    Row 0 : headers
-    Row 1 : bucket sub-headers (Qty/Amount x3)
-    Row 2+: item data, until first row with blank Item Code (= totals row).
-    Everything after the totals row (including stray blank rows) is ignored.
+    Row 0 (header)    : column titles, PLUS the full location label somewhere
+                         far to the right (e.g. col L/N) — extracted separately.
+    Row 1 (sub-header): Qty / Amount labels per bucket.
+    Row 2+            : item data, until the first row with a blank Item Code
+                         (= totals row). Everything after that is ignored.
+
+    Bucket columns (0-indexed):
+      2: Total Qty   3: Total Amt
+      4: Qty 0-60    5: Amt 0-60
+      6: Qty 60-120  7: Amt 60-120
+      8: Qty 120-180 9: Amt 120-180
+      10: Qty >180   11: Amt >180   (present on most location tabs, not all)
     """
     if len(rows) < 3:
         return None
+
+    header_row = rows[0]
+    location_name = extract_full_location_name(header_row, tab_name)
 
     data_rows = rows[2:]
     records = []
 
     for row in data_rows:
-        row = list(row) + [None] * max(0, 10 - len(row))
+        row = list(row) + [None] * max(0, 12 - len(row))
         item_code = row[0]
 
-        # First blank Item Code = totals row → stop reading this sheet
         if item_code is None or str(item_code).strip() == "":
-            break
+            break  # totals row reached — stop
 
         records.append({
-            "Item Code"   : str(item_code).strip(),
-            "Item Name"   : str(row[1]).strip() if row[1] else "",
-            "Total Qty"   : to_num(row[2]),
-            "Total Amt"   : to_num(row[3]),
-            "Qty_0_60"    : to_num(row[4]),
-            "Amt_0_60"    : to_num(row[5]),
-            "Qty_60_120"  : to_num(row[6]),
-            "Amt_60_120"  : to_num(row[7]),
-            "Qty_120_180" : to_num(row[8]),
-            "Amt_120_180" : to_num(row[9]),
-            "Location"    : location_name,
+            "Item Code"    : str(item_code).strip(),
+            "Item Name"    : str(row[1]).strip() if row[1] else "",
+            "Total Qty"    : to_num(row[2]),
+            "Total Amt"    : to_num(row[3]),
+            "Qty_0_60"     : to_num(row[4]),
+            "Amt_0_60"     : to_num(row[5]),
+            "Qty_60_120"   : to_num(row[6]),
+            "Amt_60_120"   : to_num(row[7]),
+            "Qty_120_180"  : to_num(row[8]),
+            "Amt_120_180"  : to_num(row[9]),
+            "Qty_Above_180": to_num(row[10]),
+            "Amt_Above_180": to_num(row[11]),
+            "Location"     : location_name,
+            "Tab"          : tab_name,
         })
 
     if not records:
         return None
 
     df = pd.DataFrame(records)
+    # Dead = zero movement in BOTH 0-60d and 60-120d buckets
+    # (this automatically includes items sitting only in 120-180d or Above-180d)
     df["Is Dead"] = (df["Qty_0_60"] == 0) & (df["Qty_60_120"] == 0)
     return df
 
@@ -185,9 +226,8 @@ def parse_location_sheet(rows, location_name):
 def parse_uploaded_file(file_bytes, filename):
     """
     Handles BOTH formats:
-    1. Multi-sheet workbook — one tab per location (sheet name = location code)
-    2. Single-sheet file — one location, with a 'LOCATION _ <name>' label
-       somewhere in the last few rows (older single-file-per-location format)
+    1. Multi-sheet workbook — one tab per location (full name read from row 1)
+    2. Single-sheet file — one location (older single-file-per-location format)
     Returns (list_of_dataframes, list_of_errors)
     """
     try:
@@ -200,33 +240,12 @@ def parse_uploaded_file(file_bytes, filename):
 
     dfs, errs = [], []
 
-    if len(sheets) > 1:
-        # Multi-tab workbook: sheet name IS the location
-        for sheet_name, rows in sheets.items():
-            df = parse_location_sheet(rows, sheet_name.strip())
-            if df is not None:
-                dfs.append(df)
-            else:
-                errs.append(f"⚠️ Sheet **{sheet_name}** in {filename} had no readable item rows — skipped.")
-    else:
-        # Single sheet — look for a LOCATION label in the last few rows, else use filename
-        sheet_name, rows = next(iter(sheets.items()))
-        location = filename.replace(".xlsx", "").replace(".xls", "")
-        for row in reversed(rows[-4:]):
-            for cell in row:
-                if cell and isinstance(cell, str):
-                    up = cell.upper()
-                    if any(k in up for k in ["LOCATION", "FACTORY", "GODOWN", "YARD", "DEPOT"]):
-                        clean = cell
-                        for s in ["LOCATION _", "LOCATION_", "LOCATION"]:
-                            clean = clean.replace(s, "").replace(s.lower(), "")
-                        location = clean.strip(" _:-")
-                        break
-        df = parse_location_sheet(rows, location)
+    for sheet_name, rows in sheets.items():
+        df = parse_location_sheet(rows, sheet_name.strip())
         if df is not None:
             dfs.append(df)
         else:
-            errs.append(f"❌ **{filename}**: no readable item rows found.")
+            errs.append(f"⚠️ Sheet **{sheet_name}** in {filename} had no readable item rows — skipped.")
 
     return dfs, errs
 
@@ -368,13 +387,14 @@ with tab1:
                 expanded=False
             ):
                 show = loc_df[["Item Code","Item Name","Total Qty","Total Amt",
-                               "Qty_0_60","Qty_60_120","Qty_120_180"]].copy()
+                               "Qty_0_60","Qty_60_120","Qty_120_180","Qty_Above_180"]].copy()
                 show["Total Amt"] = show["Total Amt"].apply(lambda x: f"₹{x:,.0f}")
-                for c in ["Qty_0_60","Qty_60_120","Qty_120_180"]:
+                for c in ["Qty_0_60","Qty_60_120","Qty_120_180","Qty_Above_180"]:
                     show[c] = show[c].apply(lambda x: int(x) if x > 0 else "—")
                 show = show.rename(columns={
                     "Total Qty":"Qty","Total Amt":"Value",
-                    "Qty_0_60":"0–60d","Qty_60_120":"60–120d","Qty_120_180":"120–180d"
+                    "Qty_0_60":"0–60d","Qty_60_120":"60–120d",
+                    "Qty_120_180":"120–180d","Qty_Above_180":">180d"
                 })
                 st.dataframe(show.reset_index(drop=True), use_container_width=True, hide_index=True)
 
@@ -419,7 +439,8 @@ with tab2:
             loc_sum.drop(columns=["RAG"]).to_excel(w, sheet_name="Location Summary", index=False)
             dead_v[["Location","Item Code","Item Name","Total Qty","Total Amt",
                     "Qty_0_60","Amt_0_60","Qty_60_120","Amt_60_120",
-                    "Qty_120_180","Amt_120_180"]].to_excel(w, sheet_name="Dead Items", index=False)
+                    "Qty_120_180","Amt_120_180","Qty_Above_180","Amt_Above_180"]].to_excel(
+                w, sheet_name="Dead Items", index=False)
             cross.drop(columns=["RAG","Value"]).to_excel(w, sheet_name="Cross-Location", index=False)
         buf.seek(0)
         st.download_button(
@@ -455,13 +476,14 @@ with tab3:
     view_df = view_df.copy()
     view_df["Status"] = view_df["Is Dead"].apply(lambda x: "🔴 Dead" if x else "🟢 Active")
     view_df["Value"]  = view_df["Total Amt"].apply(lambda x: f"₹{x:,.0f}")
-    for c in ["Qty_0_60","Qty_60_120","Qty_120_180"]:
+    for c in ["Qty_0_60","Qty_60_120","Qty_120_180","Qty_Above_180"]:
         view_df[c] = view_df[c].apply(lambda x: int(x) if x > 0 else "—")
 
     st.dataframe(
         view_df[["Status","Location","Item Code","Item Name","Total Qty","Value",
-                 "Qty_0_60","Qty_60_120","Qty_120_180"]].rename(columns={
-            "Total Qty":"Qty","Qty_0_60":"0–60d","Qty_60_120":"60–120d","Qty_120_180":"120–180d"
+                 "Qty_0_60","Qty_60_120","Qty_120_180","Qty_Above_180"]].rename(columns={
+            "Total Qty":"Qty","Qty_0_60":"0–60d","Qty_60_120":"60–120d",
+            "Qty_120_180":"120–180d","Qty_Above_180":">180d"
         }).sort_values(["Location","Status"]).reset_index(drop=True),
         use_container_width=True, hide_index=True
     )
