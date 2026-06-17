@@ -128,6 +128,108 @@ def get_workbook_sheets(file_bytes):
     return result
 
 
+def _col_letter(idx):
+    """0-indexed column number to Excel letter(s), e.g. 0->A, 26->AA."""
+    letters = ""
+    idx += 1
+    while idx > 0:
+        idx, rem = divmod(idx - 1, 26)
+        letters = chr(65 + rem) + letters
+    return letters
+
+
+def _escape_xml(s):
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;").replace("'", "&apos;"))
+
+
+def _sheet_xml(rows):
+    """Build worksheet XML from a list of row-lists (values: str/int/float/None)."""
+    out = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+           '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+           '<sheetData>']
+    for r_idx, row in enumerate(rows, start=1):
+        out.append(f'<row r="{r_idx}">')
+        for c_idx, val in enumerate(row):
+            if val is None or val == "":
+                continue
+            ref = f"{_col_letter(c_idx)}{r_idx}"
+            if isinstance(val, (int, float)):
+                out.append(f'<c r="{ref}"><v>{val}</v></c>')
+            else:
+                out.append(f'<c r="{ref}" t="inlineStr"><is><t xml:space="preserve">{_escape_xml(val)}</t></is></c>')
+        out.append('</row>')
+    out.append('</sheetData></worksheet>')
+    return "".join(out)
+
+
+def write_xlsx_stdlib(sheets_dict):
+    """
+    Build a valid .xlsx file using only zipfile (Python stdlib) — no openpyxl,
+    no xlsxwriter. Avoids the ModuleNotFoundError seen on some Streamlit Cloud
+    environments where openpyxl fails to install.
+    sheets_dict: {sheet_name: [[header...], [row...], ...]}
+    Returns a BytesIO ready to hand to st.download_button.
+    """
+    buf = io.BytesIO()
+    sheet_names = list(sheets_dict.keys())
+
+    content_types = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">',
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
+        '<Default Extension="xml" ContentType="application/xml"/>',
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>']
+    for i in range(len(sheet_names)):
+        content_types.append(
+            f'<Override PartName="/xl/worksheets/sheet{i+1}.xml" '
+            f'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        )
+    content_types.append('</Types>')
+
+    root_rels = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>',
+        '</Relationships>']
+
+    workbook_xml = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
+        '<sheets>']
+    for i, name in enumerate(sheet_names):
+        safe_name = _escape_xml(name)[:31]
+        workbook_xml.append(f'<sheet name="{safe_name}" sheetId="{i+1}" r:id="rId{i+1}"/>')
+    workbook_xml.append('</sheets></workbook>')
+
+    workbook_rels = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">']
+    for i in range(len(sheet_names)):
+        workbook_rels.append(
+            f'<Relationship Id="rId{i+1}" '
+            f'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+            f'Target="worksheets/sheet{i+1}.xml"/>'
+        )
+    workbook_rels.append('</Relationships>')
+
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", "".join(content_types))
+        z.writestr("_rels/.rels", "".join(root_rels))
+        z.writestr("xl/workbook.xml", "".join(workbook_xml))
+        z.writestr("xl/_rels/workbook.xml.rels", "".join(workbook_rels))
+        for i, name in enumerate(sheet_names):
+            z.writestr(f"xl/worksheets/sheet{i+1}.xml", _sheet_xml(sheets_dict[name]))
+
+    buf.seek(0)
+    return buf
+
+
+def df_to_rows(df):
+    """Convert a DataFrame to [[header...], [row...], ...] for write_xlsx_stdlib."""
+    rows = [list(df.columns)]
+    for _, r in df.iterrows():
+        rows.append([None if pd.isna(v) else v for v in r.tolist()])
+    return rows
+
+
 def to_num(v):
     if v is None:
         return 0.0
@@ -220,6 +322,22 @@ def parse_location_sheet(rows, tab_name):
     # Dead = zero movement in BOTH 0-60d and 60-120d buckets
     # (this automatically includes items sitting only in 120-180d or Above-180d)
     df["Is Dead"] = (df["Qty_0_60"] == 0) & (df["Qty_60_120"] == 0)
+
+    # Severity bucket — used to rank "how dead" an item is, worst first.
+    # Above-180d is the most severe, then 120-180d, then plain 180d-dead with
+    # no further age breakdown available.
+    def _severity(row):
+        if row["Qty_Above_180"] > 0:
+            return 3  # Above 180 days — most severe
+        if row["Qty_120_180"] > 0:
+            return 2  # 120–180 days
+        if row["Is Dead"]:
+            return 1  # Dead but age bucket unclear (e.g. NF2/NF3/NU4 with no >180 column)
+        return 0      # Active
+
+    df["Severity"] = df.apply(_severity, axis=1)
+    severity_label = {0: "Active", 1: "Dead (120–180d)", 2: "Dead (120–180d)", 3: "Dead (>180d)"}
+    df["Severity Label"] = df["Severity"].map(severity_label)
     return df
 
 
@@ -341,7 +459,121 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ── Tabs ────────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(["💀 Dead by Location", "📦 Cross-Location View", "📋 Full Inventory"])
+tab0, tab1, tab2, tab3 = st.tabs([
+    "🚨 Top Offenders & Watchlist", "💀 Dead by Location", "📦 Cross-Location View", "📋 Full Inventory"
+])
+
+
+# ══════════════════════════════════
+# TAB 0 — Top Offenders & Multi-Yard Watchlist
+# ══════════════════════════════════
+with tab0:
+    if len(dead_v) == 0:
+        st.success("No dead stock found across selected locations.")
+    else:
+        # ── Top 20 worst offenders: rank by severity (Above-180 first), then value ──
+        st.markdown('<div class="sec">🔻 Top 20 Worst Offenders — Item Lying in Yard, by Severity</div>', unsafe_allow_html=True)
+        st.caption("Ranked by age severity first (>180d worst), then by value locked up within that severity tier.")
+
+        top20 = dead_v.sort_values(
+            ["Severity", "Total Amt"], ascending=[False, False]
+        ).head(20).copy()
+
+        top20["Rank"] = range(1, len(top20) + 1)
+        top20["Value ₹"] = top20["Total Amt"].apply(lambda x: f"₹{x:,.0f}")
+        top20["Age Bucket"] = top20["Severity Label"]
+        top20["RAG"] = top20["Severity"].apply(lambda s: "🔴" if s == 3 else ("🟠" if s == 2 else "🟡"))
+
+        st.dataframe(
+            top20[["Rank","RAG","Item Code","Item Name","Location","Age Bucket","Total Qty","Value ₹"]].rename(
+                columns={"Total Qty": "Qty"}
+            ),
+            use_container_width=True, hide_index=True
+        )
+
+        # ── Multi-yard watchlist: items dead in 3+ locations ──────────────────────
+        st.markdown('<div class="sec">⚠️ Multi-Yard Watchlist — Dead in 3+ Locations</div>', unsafe_allow_html=True)
+
+        watch = dead_v.groupby(["Item Code","Item Name"]).agg(
+            Locations_Dead=("Location", "nunique"),
+            Location_List=("Location", lambda x: ", ".join(sorted(x.unique()))),
+            Max_Severity=("Severity", "max"),
+            Total_Dead_Qty=("Total Qty", "sum"),
+            Total_Dead_Value=("Total Amt", "sum"),
+        ).reset_index()
+
+        watch3plus = watch[watch["Locations_Dead"] >= 3].sort_values(
+            ["Locations_Dead", "Total_Dead_Value"], ascending=[False, False]
+        )
+
+        if len(watch3plus) == 0:
+            st.info("No items are currently dead across 3 or more yards simultaneously.")
+        else:
+            st.markdown(f"""
+            <div class="warn-box">
+              ⚠️ <b>{len(watch3plus)} SKUs</b> are dead in <b>3 or more yards at once</b> —
+              this points to a systemic issue with these items company-wide (overstocking, declining demand,
+              or a product nearing obsolescence), not just one yard's local idle stock.
+            </div>
+            """, unsafe_allow_html=True)
+
+            watch3plus_disp = watch3plus.copy()
+            watch3plus_disp["Severity Label"] = watch3plus_disp["Max_Severity"].map(
+                {0: "Active", 1: "Dead (120–180d)", 2: "Dead (120–180d)", 3: "Dead (>180d)"}
+            )
+            watch3plus_disp["Value ₹"] = watch3plus_disp["Total_Dead_Value"].apply(lambda x: f"₹{x:,.0f}")
+            watch3plus_disp["RAG"] = watch3plus_disp["Locations_Dead"].apply(
+                lambda x: "🔴" if x >= 5 else "🟠"
+            )
+
+            st.dataframe(
+                watch3plus_disp[["RAG","Item Code","Item Name","Locations_Dead","Location_List",
+                                  "Severity Label","Total_Dead_Qty","Value ₹"]].rename(columns={
+                    "Locations_Dead": "# Yards", "Location_List": "Dead In",
+                    "Total_Dead_Qty": "Total Qty"
+                }),
+                use_container_width=True, hide_index=True
+            )
+
+        # ── Severity breakdown across all dead stock ───────────────────────────────
+        st.markdown('<div class="sec">📐 Dead Stock by Severity Tier</div>', unsafe_allow_html=True)
+
+        sev_summary = dead_v.groupby("Severity Label").agg(
+            SKUs=("Item Code", "count"),
+            Qty=("Total Qty", "sum"),
+            Value=("Total Amt", "sum"),
+        ).reset_index()
+        sev_order = {"Dead (>180d)": 0, "Dead (120–180d)": 1}
+        sev_summary["_order"] = sev_summary["Severity Label"].map(sev_order)
+        sev_summary = sev_summary.sort_values("_order").drop(columns="_order")
+        sev_summary["Value ₹"] = sev_summary["Value"].apply(lambda x: f"₹{x:,.0f}")
+        sev_summary["RAG"] = sev_summary["Severity Label"].apply(lambda x: "🔴" if ">180" in x else "🟠")
+
+        st.dataframe(
+            sev_summary[["RAG","Severity Label","SKUs","Qty","Value ₹"]],
+            use_container_width=True, hide_index=True
+        )
+
+        # ── Download ─────────────────────────────────────────────────────────────
+        st.markdown('<div class="sec">Download Summary</div>', unsafe_allow_html=True)
+
+        export_sheets = {
+            "Top 20 Offenders": df_to_rows(
+                top20[["Rank","Item Code","Item Name","Location","Age Bucket","Total Qty","Total Amt"]]
+            ),
+            "Multi-Yard Watchlist": df_to_rows(
+                watch3plus[["Item Code","Item Name","Locations_Dead","Location_List","Total_Dead_Qty","Total_Dead_Value"]]
+            ) if len(watch3plus) else [["No items dead in 3+ yards"]],
+            "Severity Breakdown": df_to_rows(sev_summary[["Severity Label","SKUs","Qty","Value"]]),
+        }
+        summary_buf = write_xlsx_stdlib(export_sheets)
+        st.download_button(
+            "⬇️  Download Top Offenders & Watchlist (.xlsx)",
+            data=summary_buf,
+            file_name=f"MSafe_TopOffenders_{date.today()}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="download_summary"
+        )
 
 
 # ══════════════════════════════════
@@ -434,20 +666,20 @@ with tab2:
 
         # Download
         st.markdown('<div class="sec">Download</div>', unsafe_allow_html=True)
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine="openpyxl") as w:
-            loc_sum.drop(columns=["RAG"]).to_excel(w, sheet_name="Location Summary", index=False)
-            dead_v[["Location","Item Code","Item Name","Total Qty","Total Amt",
+        export_sheets2 = {
+            "Location Summary": df_to_rows(loc_sum.drop(columns=["RAG"])),
+            "Dead Items": df_to_rows(dead_v[["Location","Item Code","Item Name","Total Qty","Total Amt",
                     "Qty_0_60","Amt_0_60","Qty_60_120","Amt_60_120",
-                    "Qty_120_180","Amt_120_180","Qty_Above_180","Amt_Above_180"]].to_excel(
-                w, sheet_name="Dead Items", index=False)
-            cross.drop(columns=["RAG","Value"]).to_excel(w, sheet_name="Cross-Location", index=False)
-        buf.seek(0)
+                    "Qty_120_180","Amt_120_180","Qty_Above_180","Amt_Above_180"]]),
+            "Cross-Location": df_to_rows(cross.drop(columns=["RAG","Value"])),
+        }
+        buf = write_xlsx_stdlib(export_sheets2)
         st.download_button(
             "⬇️  Download Dead Inventory Report (.xlsx)",
             data=buf,
             file_name=f"MSafe_DeadInventory_{date.today()}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="download_cross_location"
         )
 
 
