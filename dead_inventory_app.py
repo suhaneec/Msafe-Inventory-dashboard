@@ -5,32 +5,118 @@ import zipfile
 import xml.etree.ElementTree as ET
 from datetime import date
 
-st.set_page_config(page_title="MSafe Dead Inventory", page_icon="🏗️", layout="wide")
+st.set_page_config(page_title="MSafe Non-Moving Stock", page_icon="🏗️", layout="wide")
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
-html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500..700&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap');
+
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 header[data-testid="stHeader"] { display: none; }
-.block-container { padding-top: 1.2rem; }
-.banner { background: #1E2D3A; color: #fff; padding: 1rem 1.4rem; border-radius: 8px; margin-bottom: 1.2rem; }
-.banner h1 { font-size: 1.2rem; font-weight: 600; margin: 0; }
-.banner .sub { font-size: 0.75rem; opacity: 0.55; font-family: 'DM Mono', monospace; margin-top: 3px; }
-.kpi-row { display: flex; gap: 0.8rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
-.kpi { background: #fff; border: 1px solid #E0DBD5; border-radius: 7px; padding: 0.85rem 1.1rem; flex: 1; min-width: 120px; }
-.kpi .lbl { font-size: 0.65rem; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.08em; color: #6A7A88; margin-bottom: 3px; }
-.kpi .val { font-size: 1.5rem; font-weight: 600; color: #1E2D3A; line-height: 1; }
-.kpi .sub { font-size: 0.68rem; color: #999; margin-top: 3px; }
-.kpi.red .val { color: #C84B2F; }
-.kpi.amber .val { color: #D97706; }
-.sec { font-size: 0.68rem; font-family: 'DM Mono', monospace; text-transform: uppercase;
-       letter-spacing: 0.1em; color: #4A5C6A; border-bottom: 1.5px solid #C84B2F;
-       padding-bottom: 4px; margin: 1.1rem 0 0.7rem; }
-.warn-box { background: #FEF3F0; border-left: 4px solid #C84B2F; border-radius: 0 6px 6px 0;
-            padding: 0.6rem 0.9rem; font-size: 0.78rem; color: #7A2E1A; margin-bottom: 0.8rem; }
-section[data-testid="stSidebar"] { background: #1E2D3A; }
-section[data-testid="stSidebar"] * { color: #B0BEC5 !important; }
-section[data-testid="stSidebar"] h2 { color: #fff !important; font-size: 0.9rem; }
+.block-container { padding-top: 1.4rem; max-width: 1200px; }
+
+/* ── Banner ─────────────────────────────────────────────── */
+.banner {
+    background: linear-gradient(135deg, #1A2B3C 0%, #0F1B26 100%);
+    color: #fff;
+    padding: 1.6rem 2rem;
+    border-radius: 10px;
+    margin-bottom: 1.6rem;
+}
+.banner h1 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.6rem;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+}
+.banner .sub {
+    font-size: 0.85rem;
+    opacity: 0.65;
+    font-weight: 400;
+}
+
+/* ── Plain-language explainer strip ───────────────────────── */
+.explain-box {
+    background: #F4F1EA;
+    border-radius: 10px;
+    padding: 1rem 1.4rem;
+    margin-bottom: 1.4rem;
+    font-size: 0.88rem;
+    color: #3A3530;
+    line-height: 1.55;
+    border-left: 4px solid #B5562B;
+}
+.explain-box b { color: #1A2B3C; }
+
+/* ── KPI cards ─────────────────────────────────────────────── */
+.kpi-row { display: flex; gap: 1rem; margin-bottom: 1.6rem; flex-wrap: wrap; }
+.kpi {
+    background: #fff;
+    border: 1px solid #E5E0D8;
+    border-radius: 10px;
+    padding: 1.1rem 1.3rem;
+    flex: 1;
+    min-width: 160px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.kpi .lbl {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #8A8378;
+    margin-bottom: 6px;
+}
+.kpi .val { font-family: 'Fraunces', serif; font-size: 1.9rem; font-weight: 600; color: #1A2B3C; line-height: 1; }
+.kpi .sub { font-size: 0.76rem; color: #9B9488; margin-top: 5px; }
+.kpi.danger .val { color: #B5562B; }
+.kpi.warn .val { color: #C8923A; }
+
+/* ── Section headers ───────────────────────────────────────── */
+.sec-title {
+    font-family: 'Fraunces', serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #1A2B3C;
+    margin: 1.8rem 0 0.3rem 0;
+}
+.sec-sub {
+    font-size: 0.82rem;
+    color: #8A8378;
+    margin-bottom: 0.9rem;
+}
+
+/* ── Severity legend chips ─────────────────────────────────── */
+.legend-row { display: flex; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 20px;
+    font-size: 0.76rem; font-weight: 600;
+}
+.chip.c-green  { background: #E3EFE3; color: #2D6A2D; }
+.chip.c-yellow { background: #FBF0DA; color: #9A6B12; }
+.chip.c-orange { background: #FCE4D4; color: #B5562B; }
+.chip.c-red    { background: #F8D7D7; color: #B02A2A; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot.c-green  { background: #4C9A4C; }
+.dot.c-yellow { background: #D9A536; }
+.dot.c-orange { background: #DD7A40; }
+.dot.c-red    { background: #C23B3B; }
+
+/* ── Alert / callout box ──────────────────────────────────── */
+.alert-box {
+    background: #FCE9E3; border-left: 4px solid #B5562B; border-radius: 0 8px 8px 0;
+    padding: 0.85rem 1.1rem; font-size: 0.85rem; color: #6B3119; margin-bottom: 1rem;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────── */
+section[data-testid="stSidebar"] { background: #1A2B3C; }
+section[data-testid="stSidebar"] * { color: #C7CDD3 !important; }
+section[data-testid="stSidebar"] h2 { color: #fff !important; font-family: 'Fraunces', serif; font-size: 1rem; }
+
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] { gap: 4px; }
+.stTabs [data-baseweb="tab"] { font-weight: 600; font-size: 0.88rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -42,7 +128,6 @@ RID_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 
 
 def _col_index(ref):
-    """Convert Excel column letters (A, B, ..., Z, AA, ...) to 0-based index."""
     letters = "".join(ch for ch in ref if ch.isalpha())
     idx = 0
     for ch in letters:
@@ -50,10 +135,21 @@ def _col_index(ref):
     return idx - 1
 
 
+def _col_letter(idx):
+    letters = ""
+    idx += 1
+    while idx > 0:
+        idx, rem = divmod(idx - 1, 26)
+        letters = chr(65 + rem) + letters
+    return letters
+
+
+def _escape_xml(s):
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;").replace("'", "&apos;"))
+
+
 def _read_sheet_rows(z, sheet_path, shared):
-    """Read all rows of one worksheet XML into a list of value-lists.
-    Each row list is sized to the row's own max column — NOT truncated,
-    so labels sitting far to the right (e.g. column L or N) are preserved."""
     with z.open(sheet_path) as f:
         tree = ET.parse(f)
     rows = []
@@ -86,13 +182,8 @@ def _read_sheet_rows(z, sheet_path, shared):
 
 
 def get_workbook_sheets(file_bytes):
-    """
-    Returns a dict {sheet_name: row_list} for every sheet/tab in the workbook,
-    using only zipfile + xml.etree (Python stdlib — no openpyxl needed).
-    """
     with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
         names = z.namelist()
-
         shared = []
         if "xl/sharedStrings.xml" in names:
             with z.open("xl/sharedStrings.xml") as f:
@@ -124,110 +215,7 @@ def get_workbook_sheets(file_bytes):
             if not path or path not in names:
                 continue
             result[sname] = _read_sheet_rows(z, path, shared)
-
     return result
-
-
-def _col_letter(idx):
-    """0-indexed column number to Excel letter(s), e.g. 0->A, 26->AA."""
-    letters = ""
-    idx += 1
-    while idx > 0:
-        idx, rem = divmod(idx - 1, 26)
-        letters = chr(65 + rem) + letters
-    return letters
-
-
-def _escape_xml(s):
-    return (str(s).replace("&", "&amp;").replace("<", "&lt;")
-            .replace(">", "&gt;").replace('"', "&quot;").replace("'", "&apos;"))
-
-
-def _sheet_xml(rows):
-    """Build worksheet XML from a list of row-lists (values: str/int/float/None)."""
-    out = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-           '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
-           '<sheetData>']
-    for r_idx, row in enumerate(rows, start=1):
-        out.append(f'<row r="{r_idx}">')
-        for c_idx, val in enumerate(row):
-            if val is None or val == "":
-                continue
-            ref = f"{_col_letter(c_idx)}{r_idx}"
-            if isinstance(val, (int, float)):
-                out.append(f'<c r="{ref}"><v>{val}</v></c>')
-            else:
-                out.append(f'<c r="{ref}" t="inlineStr"><is><t xml:space="preserve">{_escape_xml(val)}</t></is></c>')
-        out.append('</row>')
-    out.append('</sheetData></worksheet>')
-    return "".join(out)
-
-
-def write_xlsx_stdlib(sheets_dict):
-    """
-    Build a valid .xlsx file using only zipfile (Python stdlib) — no openpyxl,
-    no xlsxwriter. Avoids the ModuleNotFoundError seen on some Streamlit Cloud
-    environments where openpyxl fails to install.
-    sheets_dict: {sheet_name: [[header...], [row...], ...]}
-    Returns a BytesIO ready to hand to st.download_button.
-    """
-    buf = io.BytesIO()
-    sheet_names = list(sheets_dict.keys())
-
-    content_types = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">',
-        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
-        '<Default Extension="xml" ContentType="application/xml"/>',
-        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>']
-    for i in range(len(sheet_names)):
-        content_types.append(
-            f'<Override PartName="/xl/worksheets/sheet{i+1}.xml" '
-            f'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
-        )
-    content_types.append('</Types>')
-
-    root_rels = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>',
-        '</Relationships>']
-
-    workbook_xml = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
-        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
-        '<sheets>']
-    for i, name in enumerate(sheet_names):
-        safe_name = _escape_xml(name)[:31]
-        workbook_xml.append(f'<sheet name="{safe_name}" sheetId="{i+1}" r:id="rId{i+1}"/>')
-    workbook_xml.append('</sheets></workbook>')
-
-    workbook_rels = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">']
-    for i in range(len(sheet_names)):
-        workbook_rels.append(
-            f'<Relationship Id="rId{i+1}" '
-            f'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
-            f'Target="worksheets/sheet{i+1}.xml"/>'
-        )
-    workbook_rels.append('</Relationships>')
-
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("[Content_Types].xml", "".join(content_types))
-        z.writestr("_rels/.rels", "".join(root_rels))
-        z.writestr("xl/workbook.xml", "".join(workbook_xml))
-        z.writestr("xl/_rels/workbook.xml.rels", "".join(workbook_rels))
-        for i, name in enumerate(sheet_names):
-            z.writestr(f"xl/worksheets/sheet{i+1}.xml", _sheet_xml(sheets_dict[name]))
-
-    buf.seek(0)
-    return buf
-
-
-def df_to_rows(df):
-    """Convert a DataFrame to [[header...], [row...], ...] for write_xlsx_stdlib."""
-    rows = [list(df.columns)]
-    for _, r in df.iterrows():
-        rows.append([None if pd.isna(v) else v for v in r.tolist()])
-    return rows
 
 
 def to_num(v):
@@ -240,19 +228,12 @@ def to_num(v):
 
 
 def extract_full_location_name(header_row, tab_name):
-    """
-    The full godown/location name is written as a text label somewhere in row 1
-    (often column L or N — well to the right of the data columns), e.g.
-    'LOCATION _ NOIDA FACTORY 2 NF' or 'GODOWN_BANGLORE'.
-    We scan the ENTIRE header row for a cell matching that pattern and clean it up.
-    Column A is intentionally skipped — on at least one real sheet it contained a
-    stray/incorrect label, while the correct one was further right.
-    Falls back to the sheet tab name if nothing is found.
-    """
+    """Full godown name sits somewhere in row 1, often column L or N. Column A
+    is skipped — at least one real sheet had a stray/incorrect label there."""
     best = None
     for i, cell in enumerate(header_row):
         if i == 0:
-            continue  # skip column A — can contain stray mislabeled text
+            continue
         if cell and isinstance(cell, str):
             up = cell.upper()
             if any(k in up for k in ["LOCATION", "GODOWN", "FACTORY", "YARD", "DEPOT"]):
@@ -262,25 +243,22 @@ def extract_full_location_name(header_row, tab_name):
                 clean = clean.strip(" _:-")
                 if clean:
                     best = clean
-                    break  # first match scanning left-to-right after column A
+                    break
     return best if best else tab_name.strip()
 
 
 def parse_location_sheet(rows, tab_name):
     """
-    Parse one location's row-data into a dataframe.
-    Row 0 (header)    : column titles, PLUS the full location label somewhere
-                         far to the right (e.g. col L/N) — extracted separately.
-    Row 1 (sub-header): Qty / Amount labels per bucket.
-    Row 2+            : item data, until the first row with a blank Item Code
-                         (= totals row). Everything after that is ignored.
+    Every row in this export is ALREADY non-moving stock (60+ days idle) —
+    the file itself is pre-filtered by the ERP. The age buckets tell us HOW
+    idle each item is, not whether it's idle at all.
 
-    Bucket columns (0-indexed):
-      2: Total Qty   3: Total Amt
-      4: Qty 0-60    5: Amt 0-60
-      6: Qty 60-120  7: Amt 60-120
-      8: Qty 120-180 9: Amt 120-180
-      10: Qty >180   11: Amt >180   (present on most location tabs, not all)
+    Columns (0-indexed):
+      2: Total Qty (= idle qty)   3: Total Amt (= idle value)
+      4/5  : Qty/Amt idle 0-60 days
+      6/7  : Qty/Amt idle 60-120 days
+      8/9  : Qty/Amt idle 120-180 days
+      10/11: Qty/Amt idle 180+ days   (present on most tabs, missing on 3 of them)
     """
     if len(rows) < 3:
         return None
@@ -294,428 +272,445 @@ def parse_location_sheet(rows, tab_name):
     for row in data_rows:
         row = list(row) + [None] * max(0, 12 - len(row))
         item_code = row[0]
-
         if item_code is None or str(item_code).strip() == "":
-            break  # totals row reached — stop
+            break  # totals row reached
 
         records.append({
-            "Item Code"    : str(item_code).strip(),
-            "Item Name"    : str(row[1]).strip() if row[1] else "",
-            "Total Qty"    : to_num(row[2]),
-            "Total Amt"    : to_num(row[3]),
-            "Qty_0_60"     : to_num(row[4]),
-            "Amt_0_60"     : to_num(row[5]),
-            "Qty_60_120"   : to_num(row[6]),
-            "Amt_60_120"   : to_num(row[7]),
-            "Qty_120_180"  : to_num(row[8]),
-            "Amt_120_180"  : to_num(row[9]),
-            "Qty_Above_180": to_num(row[10]),
-            "Amt_Above_180": to_num(row[11]),
-            "Location"     : location_name,
-            "Tab"          : tab_name,
+            "Item Code"   : str(item_code).strip(),
+            "Item Name"   : str(row[1]).strip() if row[1] else "",
+            "Idle Qty"    : to_num(row[2]),
+            "Idle Value"  : to_num(row[3]),
+            "Qty_0_60"    : to_num(row[4]),
+            "Amt_0_60"    : to_num(row[5]),
+            "Qty_60_120"  : to_num(row[6]),
+            "Amt_60_120"  : to_num(row[7]),
+            "Qty_120_180" : to_num(row[8]),
+            "Amt_120_180" : to_num(row[9]),
+            "Qty_180_plus": to_num(row[10]),
+            "Amt_180_plus": to_num(row[11]),
+            "Location"    : location_name,
         })
 
     if not records:
         return None
 
     df = pd.DataFrame(records)
-    # Dead = zero movement in BOTH 0-60d and 60-120d buckets
-    # (this automatically includes items sitting only in 120-180d or Above-180d)
-    df["Is Dead"] = (df["Qty_0_60"] == 0) & (df["Qty_60_120"] == 0)
 
-    # Severity bucket — used to rank "how dead" an item is, worst first.
-    # Above-180d is the most severe, then 120-180d, then plain 180d-dead with
-    # no further age breakdown available.
-    def _severity(row):
-        if row["Qty_Above_180"] > 0:
-            return 3  # Above 180 days — most severe
-        if row["Qty_120_180"] > 0:
-            return 2  # 120–180 days
-        if row["Is Dead"]:
-            return 1  # Dead but age bucket unclear (e.g. NF2/NF3/NU4 with no >180 column)
-        return 0      # Active
+    # Worst (oldest) bucket an item falls into — this is its age classification
+    def _age_bucket(r):
+        if r["Qty_180_plus"] > 0:
+            return "180+ days"
+        if r["Qty_120_180"] > 0:
+            return "120–180 days"
+        if r["Qty_60_120"] > 0:
+            return "60–120 days"
+        if r["Qty_0_60"] > 0:
+            return "0–60 days"
+        return "180+ days"  # fallback: NF2/NF3/NU4 sheets with no >180 column,
+                              # qty present but bucket columns all blank/zero
 
-    df["Severity"] = df.apply(_severity, axis=1)
-    severity_label = {0: "Active", 1: "Dead (120–180d)", 2: "Dead (120–180d)", 3: "Dead (>180d)"}
-    df["Severity Label"] = df["Severity"].map(severity_label)
+    df["Age Bucket"] = df.apply(_age_bucket, axis=1)
+    bucket_rank = {"0–60 days": 0, "60–120 days": 1, "120–180 days": 2, "180+ days": 3}
+    df["Age Rank"] = df["Age Bucket"].map(bucket_rank)
     return df
 
 
 def parse_uploaded_file(file_bytes, filename):
-    """
-    Handles BOTH formats:
-    1. Multi-sheet workbook — one tab per location (full name read from row 1)
-    2. Single-sheet file — one location (older single-file-per-location format)
-    Returns (list_of_dataframes, list_of_errors)
-    """
     try:
         sheets = get_workbook_sheets(file_bytes)
     except Exception as e:
         return [], [f"❌ **{filename}**: cannot read file — {e}"]
-
     if not sheets:
         return [], [f"❌ **{filename}**: no worksheets found."]
 
     dfs, errs = [], []
-
     for sheet_name, rows in sheets.items():
         df = parse_location_sheet(rows, sheet_name.strip())
         if df is not None:
             dfs.append(df)
         else:
             errs.append(f"⚠️ Sheet **{sheet_name}** in {filename} had no readable item rows — skipped.")
-
     return dfs, errs
+
+
+# ── Minimal stdlib xlsx writer (no openpyxl needed) ────────────────────────────
+def _sheet_xml(rows):
+    out = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+           '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+           '<sheetData>']
+    for r_idx, row in enumerate(rows, start=1):
+        out.append(f'<row r="{r_idx}">')
+        for c_idx, val in enumerate(row):
+            if val is None or val == "":
+                continue
+            ref = f"{_col_letter(c_idx)}{r_idx}"
+            if isinstance(val, (int, float)):
+                out.append(f'<c r="{ref}"><v>{val}</v></c>')
+            else:
+                out.append(f'<c r="{ref}" t="inlineStr"><is><t xml:space="preserve">{_escape_xml(val)}</t></is></c>')
+        out.append("</row>")
+    out.append("</sheetData></worksheet>")
+    return "".join(out)
+
+
+def write_xlsx_stdlib(sheets_dict):
+    buf = io.BytesIO()
+    sheet_names = list(sheets_dict.keys())
+
+    content_types = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">',
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
+        '<Default Extension="xml" ContentType="application/xml"/>',
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>']
+    for i in range(len(sheet_names)):
+        content_types.append(
+            f'<Override PartName="/xl/worksheets/sheet{i+1}.xml" '
+            f'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        )
+    content_types.append("</Types>")
+
+    root_rels = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>',
+        '</Relationships>']
+
+    workbook_xml = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
+        '<sheets>']
+    for i, name in enumerate(sheet_names):
+        safe_name = _escape_xml(name)[:31]
+        workbook_xml.append(f'<sheet name="{safe_name}" sheetId="{i+1}" r:id="rId{i+1}"/>')
+    workbook_xml.append("</sheets></workbook>")
+
+    workbook_rels = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">']
+    for i in range(len(sheet_names)):
+        workbook_rels.append(
+            f'<Relationship Id="rId{i+1}" '
+            f'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+            f'Target="worksheets/sheet{i+1}.xml"/>'
+        )
+    workbook_rels.append("</Relationships>")
+
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", "".join(content_types))
+        z.writestr("_rels/.rels", "".join(root_rels))
+        z.writestr("xl/workbook.xml", "".join(workbook_xml))
+        z.writestr("xl/_rels/workbook.xml.rels", "".join(workbook_rels))
+        for i, name in enumerate(sheet_names):
+            z.writestr(f"xl/worksheets/sheet{i+1}.xml", _sheet_xml(sheets_dict[name]))
+    buf.seek(0)
+    return buf
+
+
+def df_to_rows(df):
+    rows = [list(df.columns)]
+    for _, r in df.iterrows():
+        rows.append([None if pd.isna(v) else v for v in r.tolist()])
+    return rows
 
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## 🏗️ MSafe\nDead Inventory")
+    st.markdown("## 🏗️ MSafe\nNon-Moving Stock")
     st.markdown("---")
     uploaded = st.file_uploader(
-        "Upload inventory file(s)",
+        "Upload inventory file",
         type=["xlsx"],
         accept_multiple_files=True,
-        help="Upload either: one workbook with a tab per location, OR multiple single-location files."
+        help="ERP export of stock not moved in 60+ days. One tab per yard, or separate files per yard."
+    )
+    st.markdown("---")
+    dead_threshold = st.select_slider(
+        "Treat as 'Dead Stock' from:",
+        options=["60 days", "120 days", "180 days"],
+        value="180 days",
+        help="Directors typically use 180 days. Move the slider to see the impact at other thresholds."
     )
     st.markdown("---")
     st.caption(f"MSafe Equipments Pvt Ltd · {date.today().strftime('%d %b %Y')}")
 
+threshold_days = int(dead_threshold.split()[0])
+threshold_rank_map = {60: 0, 120: 1, 180: 2}  # an item is "dead" if its Age Rank >= this
+dead_rank_cutoff = threshold_rank_map[threshold_days]
+
 # ── Banner ─────────────────────────────────────────────────────────────────────
 st.markdown(f"""
 <div class="banner">
-  <h1>🏗️ Dead Inventory Intelligence</h1>
-  <div class="sub">Zero outward movement in 0–120 days · All locations · {date.today().strftime('%d %b %Y')}</div>
+  <h1>🏗️ Non-Moving Stock Report</h1>
+  <div class="sub">Equipment sitting unused across all yards · As of {date.today().strftime('%d %B %Y')}</div>
 </div>
 """, unsafe_allow_html=True)
 
 if not uploaded:
     st.markdown("""
-    <div style="background:#F7F5F2;border:1.5px dashed #C8BFB5;border-radius:8px;
-                padding:2.5rem;text-align:center;color:#888;font-size:0.83rem;">
-        <b>Upload your Vsoft inventory file in the sidebar to begin.</b><br><br>
-        Works with a single workbook that has one tab per location (e.g. NF2, BG, HYD…),<br>
-        or with separate single-location files uploaded together.
+    <div style="background:#F7F5F2;border:1.5px dashed #C8BFB5;border-radius:10px;
+                padding:2.5rem;text-align:center;color:#888;font-size:0.85rem;">
+        <b>Upload the ERP non-moving stock file in the sidebar to begin.</b><br><br>
+        This file already contains only equipment that hasn't moved in 60+ days —<br>
+        one tab per yard, or separate files per yard, both work.
     </div>
     """, unsafe_allow_html=True)
     st.stop()
 
-# ── Parse uploads ──────────────────────────────────────────────────────────────
 all_dfs, errors = [], []
 for f in uploaded:
     dfs, errs = parse_uploaded_file(f.read(), f.name)
     all_dfs.extend(dfs)
     errors.extend(errs)
-
 for e in errors:
     st.warning(e)
-
 if not all_dfs:
     st.error("No usable data found in the uploaded file(s).")
     st.stop()
 
 master = pd.concat(all_dfs, ignore_index=True)
-dead   = master[master["Is Dead"]].copy()
+
+# ── Explainer strip — plain language for directors ────────────────────────────
+st.markdown(f"""
+<div class="explain-box">
+  <b>What you're looking at:</b> every item below is equipment that has been sitting unused
+  for at least 60 days — it isn't earning rental income. The longer it sits, the more it's
+  costing us in locked-up capital. Right now, anything idle <b>{threshold_days}+ days</b> is being
+  counted as <b>"Dead Stock"</b> — money tied up with no return. You can adjust this cutoff using
+  the slider in the left panel.
+</div>
+""", unsafe_allow_html=True)
 
 # ── Location filter ────────────────────────────────────────────────────────────
 all_locs = sorted(master["Location"].unique())
-sel_locs = st.sidebar.multiselect("Filter locations", all_locs, default=all_locs)
-master_v = master[master["Location"].isin(sel_locs)]
-dead_v   = dead[dead["Location"].isin(sel_locs)]
+sel_locs = st.sidebar.multiselect("Filter yards", all_locs, default=all_locs)
+master_v = master[master["Location"].isin(sel_locs)].copy()
+
+master_v["Is Dead"] = master_v["Age Rank"] >= dead_rank_cutoff
+dead_v = master_v[master_v["Is Dead"]].copy()
 
 # ── KPIs ────────────────────────────────────────────────────────────────────────
-total_items  = len(master_v)
-dead_items   = len(dead_v)
-dead_pct     = dead_items / total_items * 100 if total_items else 0
-dead_qty     = int(dead_v["Total Qty"].sum())
-dead_amt     = dead_v["Total Amt"].sum()
-total_amt    = master_v["Total Amt"].sum()
-dead_amt_pct = dead_amt / total_amt * 100 if total_amt else 0
-locs_ct      = master_v["Location"].nunique()
+total_idle_qty   = int(master_v["Idle Qty"].sum())
+total_idle_value = master_v["Idle Value"].sum()
+dead_qty         = int(dead_v["Idle Qty"].sum())
+dead_value       = dead_v["Idle Value"].sum()
+dead_value_pct   = dead_value / total_idle_value * 100 if total_idle_value else 0
+dead_skus        = len(dead_v)
+locs_ct          = master_v["Location"].nunique()
 
 st.markdown(f"""
 <div class="kpi-row">
-  <div class="kpi red">
-    <div class="lbl">Dead SKUs</div>
-    <div class="val">{dead_items}</div>
-    <div class="sub">{dead_pct:.1f}% of {total_items} lines</div>
+  <div class="kpi danger">
+    <div class="lbl">Dead Stock Value</div>
+    <div class="val">₹{dead_value/100000:.1f}L</div>
+    <div class="sub">idle {threshold_days}+ days · {dead_value_pct:.0f}% of all non-moving stock</div>
   </div>
-  <div class="kpi red">
-    <div class="lbl">Dead Units</div>
-    <div class="val">{dead_qty:,}</div>
-    <div class="sub">zero movement 0–120d</div>
+  <div class="kpi danger">
+    <div class="lbl">Dead Stock Items</div>
+    <div class="val">{dead_skus}</div>
+    <div class="sub">{dead_qty:,} units across {locs_ct} yards</div>
   </div>
-  <div class="kpi amber">
-    <div class="lbl">Dead Value</div>
-    <div class="val">₹{dead_amt/100000:.2f}L</div>
-    <div class="sub">{dead_amt_pct:.1f}% of total value</div>
+  <div class="kpi warn">
+    <div class="lbl">All Non-Moving Stock</div>
+    <div class="val">₹{total_idle_value/100000:.1f}L</div>
+    <div class="sub">{total_idle_qty:,} units, every age bucket</div>
   </div>
   <div class="kpi">
-    <div class="lbl">Total Inv Value</div>
-    <div class="val">₹{total_amt/100000:.2f}L</div>
-    <div class="sub">{locs_ct} location(s) loaded</div>
+    <div class="lbl">Yards Reviewed</div>
+    <div class="val">{locs_ct}</div>
+    <div class="sub">{len(master_v)} item-lines checked</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
 
+# ── Severity legend ────────────────────────────────────────────────────────────
+st.markdown("""
+<div class="legend-row">
+  <span class="chip c-green"><span class="dot c-green"></span>0–60 days — Just starting to slow</span>
+  <span class="chip c-yellow"><span class="dot c-yellow"></span>60–120 days — Worth watching</span>
+  <span class="chip c-orange"><span class="dot c-orange"></span>120–180 days — Needs action</span>
+  <span class="chip c-red"><span class="dot c-red"></span>180+ days — Dead stock</span>
+</div>
+""", unsafe_allow_html=True)
+
+RAG_COLOR = {"0–60 days": "🟢", "60–120 days": "🟡", "120–180 days": "🟠", "180+ days": "🔴"}
+
+
 # ── Tabs ────────────────────────────────────────────────────────────────────────
 tab0, tab1, tab2, tab3 = st.tabs([
-    "🚨 Top Offenders & Watchlist", "💀 Dead by Location", "📦 Cross-Location View", "📋 Full Inventory"
+    "📊 Director Summary", "🏭 By Yard", "🔁 Repeat Offenders", "📋 Full Detail"
 ])
 
 
-# ══════════════════════════════════
-# TAB 0 — Top Offenders & Multi-Yard Watchlist
-# ══════════════════════════════════
+# ══════════════════════════════════════════════
+# TAB 0 — Director Summary (charts + top offenders)
+# ══════════════════════════════════════════════
 with tab0:
-    if len(dead_v) == 0:
-        st.success("No dead stock found across selected locations.")
+    st.markdown('<div class="sec-title">Where is the money stuck?</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">Value of dead stock by yard — worst yards first</div>', unsafe_allow_html=True)
+
+    yard_chart_data = dead_v.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
+    if len(yard_chart_data) > 0:
+        chart_df = yard_chart_data.reset_index()
+        chart_df.columns = ["Yard", "Dead Stock Value"]
+        st.bar_chart(chart_df.set_index("Yard"), use_container_width=True, color="#B5562B")
     else:
-        # ── Top 20 worst offenders: rank by severity (Above-180 first), then value ──
-        st.markdown('<div class="sec">🔻 Top 20 Worst Offenders — Item Lying in Yard, by Severity</div>', unsafe_allow_html=True)
-        st.caption("Ranked by age severity first (>180d worst), then by value locked up within that severity tier.")
+        st.info(f"No items are idle {threshold_days}+ days at the current threshold.")
 
-        top20 = dead_v.sort_values(
-            ["Severity", "Total Amt"], ascending=[False, False]
-        ).head(20).copy()
+    st.markdown('<div class="sec-title">How old is the problem?</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">Value of ALL non-moving stock, split by how long it has been sitting</div>', unsafe_allow_html=True)
 
-        top20["Rank"] = range(1, len(top20) + 1)
-        top20["Value ₹"] = top20["Total Amt"].apply(lambda x: f"₹{x:,.0f}")
-        top20["Age Bucket"] = top20["Severity Label"]
-        top20["RAG"] = top20["Severity"].apply(lambda s: "🔴" if s == 3 else ("🟠" if s == 2 else "🟡"))
+    age_order = ["0–60 days", "60–120 days", "120–180 days", "180+ days"]
+    age_chart_data = master_v.groupby("Age Bucket")["Idle Value"].sum().reindex(age_order).fillna(0)
+    age_chart_df = age_chart_data.reset_index()
+    age_chart_df.columns = ["Age", "Value"]
+    st.bar_chart(age_chart_df.set_index("Age"), use_container_width=True, color="#C8923A")
+
+    if dead_skus > 0:
+        st.markdown('<div class="sec-title">Top 15 single biggest write-off candidates</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-sub">The individual items locking up the most capital, worst first</div>', unsafe_allow_html=True)
+
+        top15 = dead_v.sort_values(["Age Rank", "Idle Value"], ascending=[False, False]).head(15).copy()
+        top15["RAG"] = top15["Age Bucket"].map(RAG_COLOR)
+        top15["Value"] = top15["Idle Value"].apply(lambda x: f"₹{x:,.0f}")
+        top15_disp = top15[["RAG", "Item Code", "Item Name", "Location", "Age Bucket", "Idle Qty", "Value"]].rename(
+            columns={"Idle Qty": "Qty", "Location": "Yard"}
+        )
+        st.dataframe(top15_disp, use_container_width=True, hide_index=True)
+
+        # Download
+        export_sheets = {
+            "Top 15 Items": df_to_rows(
+                top15[["Item Code","Item Name","Location","Age Bucket","Idle Qty","Idle Value"]]
+            ),
+        }
+        buf = write_xlsx_stdlib(export_sheets)
+        st.download_button(
+            "⬇️  Download this summary (.xlsx)",
+            data=buf,
+            file_name=f"MSafe_DeadStock_Summary_{date.today()}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+
+# ══════════════════════════════════════════════
+# TAB 1 — By Yard
+# ══════════════════════════════════════════════
+with tab1:
+    st.markdown('<div class="sec-title">Dead stock, yard by yard</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sec-sub">Worst yards first — based on the {threshold_days}-day cutoff</div>', unsafe_allow_html=True)
+
+    if len(dead_v) == 0:
+        st.success(f"No yard currently has stock idle {threshold_days}+ days.")
+    else:
+        loc_dead = dead_v.groupby("Location").agg(
+            Items=("Item Code", "count"),
+            Qty=("Idle Qty", "sum"),
+            Value=("Idle Value", "sum"),
+        ).reset_index()
+        loc_all = master_v.groupby("Location").agg(All_Items=("Item Code", "count")).reset_index()
+        loc_dead = loc_dead.merge(loc_all, on="Location")
+        loc_dead["% of yard's idle items"] = (loc_dead["Items"] / loc_dead["All_Items"] * 100).round(0)
+        loc_dead = loc_dead.sort_values("Value", ascending=False)
+        loc_dead["RAG"] = loc_dead["% of yard's idle items"].apply(
+            lambda x: "🔴" if x >= 60 else ("🟠" if x >= 35 else ("🟡" if x >= 15 else "🟢"))
+        )
+        loc_dead["Value ₹"] = loc_dead["Value"].apply(lambda x: f"₹{x:,.0f}")
 
         st.dataframe(
-            top20[["Rank","RAG","Item Code","Item Name","Location","Age Bucket","Total Qty","Value ₹"]].rename(
-                columns={"Total Qty": "Qty"}
+            loc_dead[["RAG", "Location", "Items", "Qty", "Value ₹", "% of yard's idle items"]].rename(
+                columns={"Location": "Yard", "Qty": "Units"}
             ),
             use_container_width=True, hide_index=True
         )
 
-        # ── Multi-yard watchlist: items dead in 3+ locations ──────────────────────
-        st.markdown('<div class="sec">⚠️ Multi-Yard Watchlist — Dead in 3+ Locations</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-title">Item-level detail per yard</div>', unsafe_allow_html=True)
 
-        watch = dead_v.groupby(["Item Code","Item Name"]).agg(
-            Locations_Dead=("Location", "nunique"),
-            Location_List=("Location", lambda x: ", ".join(sorted(x.unique()))),
-            Max_Severity=("Severity", "max"),
-            Total_Dead_Qty=("Total Qty", "sum"),
-            Total_Dead_Value=("Total Amt", "sum"),
-        ).reset_index()
+        for loc in loc_dead["Location"]:
+            loc_df = dead_v[dead_v["Location"] == loc].sort_values(["Age Rank", "Idle Value"], ascending=[False, False])
+            with st.expander(f"📍 {loc}  —  {len(loc_df)} dead items  ·  ₹{loc_df['Idle Value'].sum():,.0f}", expanded=False):
+                show = loc_df[["Item Code", "Item Name", "Age Bucket", "Idle Qty", "Idle Value"]].copy()
+                show["RAG"] = show["Age Bucket"].map(RAG_COLOR)
+                show["Idle Value"] = show["Idle Value"].apply(lambda x: f"₹{x:,.0f}")
+                show = show.rename(columns={"Idle Qty": "Qty"})
+                st.dataframe(
+                    show[["RAG", "Item Code", "Item Name", "Age Bucket", "Qty", "Idle Value"]],
+                    use_container_width=True, hide_index=True
+                )
 
-        watch3plus = watch[watch["Locations_Dead"] >= 3].sort_values(
-            ["Locations_Dead", "Total_Dead_Value"], ascending=[False, False]
-        )
 
-        if len(watch3plus) == 0:
-            st.info("No items are currently dead across 3 or more yards simultaneously.")
-        else:
+# ══════════════════════════════════════════════
+# TAB 2 — Repeat Offenders (multi-yard dead items)
+# ══════════════════════════════════════════════
+with tab2:
+    st.markdown('<div class="sec-title">Items dead in many yards at once</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">These point to a company-wide issue with the item — not just one yard\'s problem</div>', unsafe_allow_html=True)
+
+    if len(dead_v) == 0:
+        st.success("No dead stock at the current threshold.")
+    else:
+        cross = dead_v.groupby(["Item Code", "Item Name"]).agg(
+            Yards=("Location", "nunique"),
+            Yard_List=("Location", lambda x: ", ".join(sorted(x.unique()))),
+            Qty=("Idle Qty", "sum"),
+            Value=("Idle Value", "sum"),
+        ).reset_index().sort_values(["Yards", "Value"], ascending=[False, False])
+
+        multi = cross[cross["Yards"] >= 3]
+        if len(multi):
             st.markdown(f"""
-            <div class="warn-box">
-              ⚠️ <b>{len(watch3plus)} SKUs</b> are dead in <b>3 or more yards at once</b> —
-              this points to a systemic issue with these items company-wide (overstocking, declining demand,
-              or a product nearing obsolescence), not just one yard's local idle stock.
+            <div class="alert-box">
+              <b>{len(multi)} items</b> are dead stock in <b>3 or more yards at the same time.</b>
+              This usually means the item itself is overstocked or losing demand company-wide —
+              worth reviewing centrally rather than yard by yard.
             </div>
             """, unsafe_allow_html=True)
 
-            watch3plus_disp = watch3plus.copy()
-            watch3plus_disp["Severity Label"] = watch3plus_disp["Max_Severity"].map(
-                {0: "Active", 1: "Dead (120–180d)", 2: "Dead (120–180d)", 3: "Dead (>180d)"}
-            )
-            watch3plus_disp["Value ₹"] = watch3plus_disp["Total_Dead_Value"].apply(lambda x: f"₹{x:,.0f}")
-            watch3plus_disp["RAG"] = watch3plus_disp["Locations_Dead"].apply(
-                lambda x: "🔴" if x >= 5 else "🟠"
-            )
-
-            st.dataframe(
-                watch3plus_disp[["RAG","Item Code","Item Name","Locations_Dead","Location_List",
-                                  "Severity Label","Total_Dead_Qty","Value ₹"]].rename(columns={
-                    "Locations_Dead": "# Yards", "Location_List": "Dead In",
-                    "Total_Dead_Qty": "Total Qty"
-                }),
-                use_container_width=True, hide_index=True
-            )
-
-        # ── Severity breakdown across all dead stock ───────────────────────────────
-        st.markdown('<div class="sec">📐 Dead Stock by Severity Tier</div>', unsafe_allow_html=True)
-
-        sev_summary = dead_v.groupby("Severity Label").agg(
-            SKUs=("Item Code", "count"),
-            Qty=("Total Qty", "sum"),
-            Value=("Total Amt", "sum"),
-        ).reset_index()
-        sev_order = {"Dead (>180d)": 0, "Dead (120–180d)": 1}
-        sev_summary["_order"] = sev_summary["Severity Label"].map(sev_order)
-        sev_summary = sev_summary.sort_values("_order").drop(columns="_order")
-        sev_summary["Value ₹"] = sev_summary["Value"].apply(lambda x: f"₹{x:,.0f}")
-        sev_summary["RAG"] = sev_summary["Severity Label"].apply(lambda x: "🔴" if ">180" in x else "🟠")
+        cross["RAG"] = cross["Yards"].apply(lambda x: "🔴" if x >= 5 else ("🟠" if x >= 3 else "🟡"))
+        cross["Value ₹"] = cross["Value"].apply(lambda x: f"₹{x:,.0f}")
 
         st.dataframe(
-            sev_summary[["RAG","Severity Label","SKUs","Qty","Value ₹"]],
+            cross[["RAG", "Item Code", "Item Name", "Yards", "Yard_List", "Qty", "Value ₹"]].rename(
+                columns={"Yards": "# Yards", "Yard_List": "Found In"}
+            ),
             use_container_width=True, hide_index=True
         )
 
-        # ── Download ─────────────────────────────────────────────────────────────
-        st.markdown('<div class="sec">Download Summary</div>', unsafe_allow_html=True)
-
-        export_sheets = {
-            "Top 20 Offenders": df_to_rows(
-                top20[["Rank","Item Code","Item Name","Location","Age Bucket","Total Qty","Total Amt"]]
-            ),
-            "Multi-Yard Watchlist": df_to_rows(
-                watch3plus[["Item Code","Item Name","Locations_Dead","Location_List","Total_Dead_Qty","Total_Dead_Value"]]
-            ) if len(watch3plus) else [["No items dead in 3+ yards"]],
-            "Severity Breakdown": df_to_rows(sev_summary[["Severity Label","SKUs","Qty","Value"]]),
-        }
-        summary_buf = write_xlsx_stdlib(export_sheets)
+        export_sheets2 = {"Repeat Offenders": df_to_rows(cross[["Item Code","Item Name","Yards","Yard_List","Qty","Value"]])}
+        buf2 = write_xlsx_stdlib(export_sheets2)
         st.download_button(
-            "⬇️  Download Top Offenders & Watchlist (.xlsx)",
-            data=summary_buf,
-            file_name=f"MSafe_TopOffenders_{date.today()}.xlsx",
+            "⬇️  Download this list (.xlsx)",
+            data=buf2,
+            file_name=f"MSafe_RepeatOffenders_{date.today()}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="download_summary"
         )
 
 
-# ══════════════════════════════════
-# TAB 1 — Dead by Location
-# ══════════════════════════════════
-with tab1:
-    if len(dead_v) == 0:
-        st.success("No dead stock found across selected locations.")
-    else:
-        st.markdown('<div class="sec">Location Summary</div>', unsafe_allow_html=True)
-
-        loc_dead = dead_v.groupby("Location").agg(
-            Dead_SKUs=("Item Code", "count"),
-            Dead_Qty=("Total Qty", "sum"),
-            Dead_Value=("Total Amt", "sum"),
-        ).reset_index()
-        loc_total = master_v.groupby("Location").agg(
-            Total_SKUs=("Item Code", "count"),
-            Total_Value=("Total Amt", "sum"),
-        ).reset_index()
-        loc_sum = loc_dead.merge(loc_total, on="Location")
-        loc_sum["Dead SKU %"]   = (loc_sum["Dead_SKUs"] / loc_sum["Total_SKUs"] * 100).round(1)
-        loc_sum["Dead Value %"] = (loc_sum["Dead_Value"] / loc_sum["Total_Value"] * 100).round(1)
-        loc_sum["Dead Value ₹"] = loc_sum["Dead_Value"].apply(lambda x: f"₹{x:,.0f}")
-        loc_sum["RAG"]          = loc_sum["Dead SKU %"].apply(
-            lambda x: "🔴" if x >= 40 else ("🟡" if x >= 20 else "🟢")
-        )
-        loc_sum = loc_sum.sort_values("Dead_Value", ascending=False)
-
-        st.dataframe(
-            loc_sum[["RAG","Location","Dead_SKUs","Dead SKU %","Dead_Qty","Dead Value ₹","Dead Value %"]].rename(
-                columns={"Dead_SKUs":"Dead SKUs","Dead_Qty":"Dead Qty (units)"}
-            ),
-            use_container_width=True, hide_index=True
-        )
-
-        st.markdown('<div class="sec">Dead Items per Location</div>', unsafe_allow_html=True)
-
-        for loc in sorted(dead_v["Location"].unique()):
-            loc_df = dead_v[dead_v["Location"] == loc].sort_values("Total Amt", ascending=False)
-            with st.expander(
-                f"📍 {loc}  —  {len(loc_df)} SKUs  ·  {int(loc_df['Total Qty'].sum())} units  ·  ₹{loc_df['Total Amt'].sum():,.0f}",
-                expanded=False
-            ):
-                show = loc_df[["Item Code","Item Name","Total Qty","Total Amt",
-                               "Qty_0_60","Qty_60_120","Qty_120_180","Qty_Above_180"]].copy()
-                show["Total Amt"] = show["Total Amt"].apply(lambda x: f"₹{x:,.0f}")
-                for c in ["Qty_0_60","Qty_60_120","Qty_120_180","Qty_Above_180"]:
-                    show[c] = show[c].apply(lambda x: int(x) if x > 0 else "—")
-                show = show.rename(columns={
-                    "Total Qty":"Qty","Total Amt":"Value",
-                    "Qty_0_60":"0–60d","Qty_60_120":"60–120d",
-                    "Qty_120_180":"120–180d","Qty_Above_180":">180d"
-                })
-                st.dataframe(show.reset_index(drop=True), use_container_width=True, hide_index=True)
-
-
-# ══════════════════════════════════
-# TAB 2 — Cross-location
-# ══════════════════════════════════
-with tab2:
-    st.markdown('<div class="sec">Items Dead Across Multiple Locations</div>', unsafe_allow_html=True)
-
-    if len(dead_v) == 0:
-        st.success("No dead items.")
-    else:
-        cross = dead_v.groupby(["Item Code","Item Name"]).agg(
-            Locations_Dead=("Location","nunique"),
-            Location_Names=("Location", lambda x: ", ".join(sorted(x.unique()))),
-            Total_Dead_Qty=("Total Qty","sum"),
-            Total_Dead_Value=("Total Amt","sum"),
-        ).reset_index().sort_values("Total_Dead_Value", ascending=False)
-
-        multi = cross[cross["Locations_Dead"] > 1]
-        if len(multi):
-            st.markdown(f"""
-            <div class="warn-box">⚠️ <b>{len(multi)} SKUs</b> are dead across 2+ locations simultaneously —
-            systemic underutilisation. Review for disposal or redistribution.</div>
-            """, unsafe_allow_html=True)
-
-        cross["RAG"]   = cross["Locations_Dead"].apply(lambda x: "🔴" if x>=3 else ("🟡" if x>=2 else "⚪"))
-        cross["Value"] = cross["Total_Dead_Value"].apply(lambda x: f"₹{x:,.0f}")
-
-        st.dataframe(
-            cross[["RAG","Item Code","Item Name","Locations_Dead","Location_Names","Total_Dead_Qty","Value"]].rename(
-                columns={"Locations_Dead":"# Locations","Location_Names":"Dead In","Total_Dead_Qty":"Dead Qty"}
-            ),
-            use_container_width=True, hide_index=True
-        )
-
-        # Download
-        st.markdown('<div class="sec">Download</div>', unsafe_allow_html=True)
-        export_sheets2 = {
-            "Location Summary": df_to_rows(loc_sum.drop(columns=["RAG"])),
-            "Dead Items": df_to_rows(dead_v[["Location","Item Code","Item Name","Total Qty","Total Amt",
-                    "Qty_0_60","Amt_0_60","Qty_60_120","Amt_60_120",
-                    "Qty_120_180","Amt_120_180","Qty_Above_180","Amt_Above_180"]]),
-            "Cross-Location": df_to_rows(cross.drop(columns=["RAG","Value"])),
-        }
-        buf = write_xlsx_stdlib(export_sheets2)
-        st.download_button(
-            "⬇️  Download Dead Inventory Report (.xlsx)",
-            data=buf,
-            file_name=f"MSafe_DeadInventory_{date.today()}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="download_cross_location"
-        )
-
-
-# ══════════════════════════════════
-# TAB 3 — Full inventory
-# ══════════════════════════════════
+# ══════════════════════════════════════════════
+# TAB 3 — Full Detail
+# ══════════════════════════════════════════════
 with tab3:
-    st.markdown('<div class="sec">Complete Inventory — All Items</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-title">Every non-moving item</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">Search or filter to find a specific item or yard</div>', unsafe_allow_html=True)
 
-    c1, c2 = st.columns([3,1])
+    c1, c2 = st.columns([3, 1])
     with c1:
-        search = st.text_input("Search item name or code", placeholder="e.g. Prop jack, MSF5SF…")
+        search = st.text_input("Search item name or code", placeholder="e.g. Prop jack, Scissor lift…")
     with c2:
-        show_filter = st.selectbox("Show", ["All","Dead only","Active only"])
+        age_filter = st.selectbox("Age bucket", ["All"] + age_order)
 
     view_df = master_v.copy()
     if search:
         mask = (view_df["Item Name"].str.contains(search, case=False, na=False) |
                 view_df["Item Code"].str.contains(search, case=False, na=False))
         view_df = view_df[mask]
-    if show_filter == "Dead only":
-        view_df = view_df[view_df["Is Dead"]]
-    elif show_filter == "Active only":
-        view_df = view_df[~view_df["Is Dead"]]
+    if age_filter != "All":
+        view_df = view_df[view_df["Age Bucket"] == age_filter]
 
     view_df = view_df.copy()
-    view_df["Status"] = view_df["Is Dead"].apply(lambda x: "🔴 Dead" if x else "🟢 Active")
-    view_df["Value"]  = view_df["Total Amt"].apply(lambda x: f"₹{x:,.0f}")
-    for c in ["Qty_0_60","Qty_60_120","Qty_120_180","Qty_Above_180"]:
-        view_df[c] = view_df[c].apply(lambda x: int(x) if x > 0 else "—")
+    view_df["RAG"] = view_df["Age Bucket"].map(RAG_COLOR)
+    view_df["Value"] = view_df["Idle Value"].apply(lambda x: f"₹{x:,.0f}")
 
     st.dataframe(
-        view_df[["Status","Location","Item Code","Item Name","Total Qty","Value",
-                 "Qty_0_60","Qty_60_120","Qty_120_180","Qty_Above_180"]].rename(columns={
-            "Total Qty":"Qty","Qty_0_60":"0–60d","Qty_60_120":"60–120d",
-            "Qty_120_180":"120–180d","Qty_Above_180":">180d"
-        }).sort_values(["Location","Status"]).reset_index(drop=True),
+        view_df[["RAG", "Location", "Item Code", "Item Name", "Age Bucket", "Idle Qty", "Value"]].rename(
+            columns={"Location": "Yard", "Idle Qty": "Qty"}
+        ).sort_values(["Location", "RAG"]).reset_index(drop=True),
         use_container_width=True, hide_index=True
     )
