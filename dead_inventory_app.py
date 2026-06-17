@@ -422,36 +422,42 @@ def df_to_rows(df):
     return rows
 
 
-def horizontal_bar_chart(df, label_col, value_col, accent_color, value_format="₹{:,.0f}", max_label_len=28):
+def horizontal_bar_chart(df, label_col, value_col, accent_color, value_format="₹{:,.0f}"):
     """
     A clean, easy-to-read horizontal bar chart — longest bar on top, value labels
-    printed at the end of each bar, long names truncated with full name on hover.
-    Uses Altair (ships with Streamlit, no extra install) instead of st.bar_chart,
-    since vertical bars with long product names become unreadable.
+    printed at the end of each bar, sized up for readability. Uses Altair (ships
+    with Streamlit, no extra install) instead of st.bar_chart, since vertical bars
+    with long product names become unreadable.
 
-    Value labels sit just past the end of each bar, sized up for readability, on
-    their own light background pill — this keeps them legible regardless of
-    whether the surrounding page is light or dark themed, and avoids the failure
-    case where a short bar (e.g. Punjab: ₹44,650) is too thin to fit white text
-    inside it next to a long bar (e.g. Mumbai: ₹1.2 Cr).
+    Full item/yard names are always shown — never truncated — since directors
+    need to read the exact product name without hovering for a tooltip.
+
+    Value labels sit just past the end of each bar, on the chart's own fixed
+    light background — this keeps them legible regardless of whether the
+    surrounding page is light or dark themed, and avoids the failure case where
+    a short bar (e.g. Punjab: ₹44,650) is too thin to fit text inside it next to
+    a long bar (e.g. Mumbai: ₹1.2 Cr).
     """
     chart_df = df.copy()
     chart_df["_label_full"] = chart_df[label_col].astype(str)
-    chart_df["_label_short"] = chart_df["_label_full"].apply(
-        lambda s: s if len(s) <= max_label_len else s[: max_label_len - 1] + "…"
-    )
     chart_df["_value_label"] = chart_df[value_col].apply(lambda v: value_format.format(v))
 
     # Pad the x-axis scale so labels printed past the bar end always have room
     # and never get clipped at the right edge of the chart.
     max_val = chart_df[value_col].max()
-    x_scale = alt.Scale(domain=[0, max_val * 1.32])
+    x_scale = alt.Scale(domain=[0, max_val * 1.35])
+
+    # Widest label in this chart determines how much left-side room to reserve —
+    # long product names (up to ~70 characters) need real width, not a fixed cap.
+    longest_label_chars = chart_df["_label_full"].str.len().max()
+    label_limit_px = min(max(longest_label_chars * 7, 140), 480)
 
     bars = alt.Chart(chart_df).mark_bar(color=accent_color, cornerRadiusEnd=3).encode(
         x=alt.X(f"{value_col}:Q", title=None, scale=x_scale,
                 axis=alt.Axis(labels=False, grid=False, ticks=False, domain=False)),
-        y=alt.Y("_label_short:N", sort="-x", title=None,
-                axis=alt.Axis(labelLimit=220, labelFontSize=13, labelColor="#3A3530", labelFontWeight=500)),
+        y=alt.Y("_label_full:N", sort="-x", title=None,
+                axis=alt.Axis(labelLimit=label_limit_px, labelFontSize=13,
+                               labelColor="#3A3530", labelFontWeight=500)),
         tooltip=[alt.Tooltip("_label_full:N", title="Item"),
                  alt.Tooltip(f"{value_col}:Q", title="Value", format=",.0f")],
     )
@@ -463,7 +469,7 @@ def horizontal_bar_chart(df, label_col, value_col, accent_color, value_format="�
         height=max(34 * len(chart_df), 140)
     ).configure_view(strokeWidth=0, fill="#FAF8F4").configure(background="#FAF8F4")
 
-    st.altair_chart(chart, use_container_width=True, theme=None)
+    st.altair_chart(chart, width="stretch", theme=None)
 
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
@@ -669,7 +675,7 @@ with tab0:
         yard_table["Units"] = yard_table["Units"].astype(int)
         yard_table.insert(0, "Rank", range(1, len(yard_table) + 1))
 
-        st.dataframe(yard_table[["Rank", "Yard", "Units", "Value ₹"]], use_container_width=True, hide_index=True)
+        st.dataframe(yard_table[["Rank", "Yard", "Units", "Value ₹"]], width="stretch", hide_index=True)
 
         # ── Product-wise: units and value, both high to low ────────────────────
         st.markdown(f'<div class="sec-sub" style="margin-top:1rem;"><b>Which product is dead the most</b></div>', unsafe_allow_html=True)
@@ -700,7 +706,7 @@ with tab0:
             prod_table[["Rank", "Item Code", "Item Name", "Yards", "Units", "Value ₹"]].rename(
                 columns={"Yards": "# Yards Affected"}
             ),
-            use_container_width=True, hide_index=True
+            width="stretch", hide_index=True
         )
 
         # ── Download for this band ──────────────────────────────────────────────
@@ -755,7 +761,7 @@ with tab1:
             loc_dead[["RAG", "Location", "Items", "Qty", "Value ₹", "% of yard's idle items"]].rename(
                 columns={"Location": "Yard", "Qty": "Units"}
             ),
-            use_container_width=True, hide_index=True
+            width="stretch", hide_index=True
         )
 
         st.markdown('<div class="sec-title">Item-level detail per yard</div>', unsafe_allow_html=True)
@@ -769,7 +775,7 @@ with tab1:
                 show = show.rename(columns={"Idle Qty": "Qty"})
                 st.dataframe(
                     show[["RAG", "Item Code", "Item Name", "Age Bucket", "Qty", "Idle Value"]],
-                    use_container_width=True, hide_index=True
+                    width="stretch", hide_index=True
                 )
 
 
@@ -807,7 +813,7 @@ with tab2:
             cross[["RAG", "Item Code", "Item Name", "Yards", "Yard_List", "Qty", "Value ₹"]].rename(
                 columns={"Yards": "# Yards", "Yard_List": "Found In"}
             ),
-            use_container_width=True, hide_index=True
+            width="stretch", hide_index=True
         )
 
         export_sheets2 = {"Repeat Offenders": df_to_rows(cross[["Item Code","Item Name","Yards","Yard_List","Qty","Value"]])}
