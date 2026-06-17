@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 import io
 import zipfile
 import xml.etree.ElementTree as ET
@@ -78,11 +79,14 @@ header[data-testid="stHeader"] { display: none; }
     font-size: 1.15rem;
     font-weight: 600;
     color: #1A2B3C;
-    margin: 1.8rem 0 0.3rem 0;
+    background: #F4F1EA;
+    padding: 0.55rem 1rem;
+    border-radius: 8px;
+    margin: 1.8rem 0 0.5rem 0;
 }
 .sec-sub {
     font-size: 0.82rem;
-    color: #8A8378;
+    color: #6B6458;
     margin-bottom: 0.9rem;
 }
 
@@ -115,8 +119,15 @@ section[data-testid="stSidebar"] * { color: #C7CDD3 !important; }
 section[data-testid="stSidebar"] h2 { color: #fff !important; font-family: 'Fraunces', serif; font-size: 1rem; }
 
 /* Tabs */
-.stTabs [data-baseweb="tab-list"] { gap: 4px; }
-.stTabs [data-baseweb="tab"] { font-weight: 600; font-size: 0.88rem; }
+.stTabs [data-baseweb="tab-list"] { gap: 4px; background: transparent; }
+.stTabs [data-baseweb="tab"] {
+    font-weight: 600; font-size: 0.88rem; color: #6B6458;
+    background: #F4F1EA; border-radius: 8px 8px 0 0; padding: 0.5rem 1rem;
+}
+.stTabs [aria-selected="true"] {
+    color: #1A2B3C !important; background: #fff !important;
+    border-bottom: 3px solid #B5562B !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -411,6 +422,33 @@ def df_to_rows(df):
     return rows
 
 
+def horizontal_bar_chart(df, label_col, value_col, accent_color, value_format="₹{:,.0f}", max_label_len=28):
+    """
+    A clean, easy-to-read horizontal bar chart — longest bar on top, value labels
+    printed at the end of each bar, long names truncated with full name on hover.
+    Uses Altair (ships with Streamlit, no extra install) instead of st.bar_chart,
+    since vertical bars with long product names become unreadable.
+    """
+    chart_df = df.copy()
+    chart_df["_label_full"] = chart_df[label_col].astype(str)
+    chart_df["_label_short"] = chart_df["_label_full"].apply(
+        lambda s: s if len(s) <= max_label_len else s[: max_label_len - 1] + "…"
+    )
+    chart_df["_value_label"] = chart_df[value_col].apply(lambda v: value_format.format(v))
+
+    bars = alt.Chart(chart_df).mark_bar(color=accent_color, cornerRadiusEnd=3).encode(
+        x=alt.X(f"{value_col}:Q", title=None, axis=alt.Axis(labels=False, grid=False, ticks=False)),
+        y=alt.Y("_label_short:N", sort="-x", title=None,
+                axis=alt.Axis(labelLimit=220, labelFontSize=12)),
+        tooltip=[alt.Tooltip("_label_full:N", title="Item"),
+                 alt.Tooltip(f"{value_col}:Q", title="Value", format=",.0f")],
+    )
+    text = bars.mark_text(align="left", dx=4, fontSize=11, color="#3A3530").encode(text="_value_label:N")
+    chart = (bars + text).properties(height=max(28 * len(chart_df), 120)).configure_view(strokeWidth=0)
+
+    st.altair_chart(chart, use_container_width=True)
+
+
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🏗️ MSafe\nNon-Moving Stock")
@@ -582,12 +620,12 @@ with tab0:
             st.caption("By units — highest first")
             chart1 = yard_units.reset_index()
             chart1.columns = ["Yard", "Units"]
-            st.bar_chart(chart1.set_index("Yard"), use_container_width=True, color=accent_color)
+            horizontal_bar_chart(chart1, "Yard", "Units", accent_color, value_format="{:,.0f} units")
         with yc2:
             st.caption("By value (₹) — highest first")
             chart2 = yard_value.reset_index()
             chart2.columns = ["Yard", "Value"]
-            st.bar_chart(chart2.set_index("Yard"), use_container_width=True, color=accent_color)
+            horizontal_bar_chart(chart2, "Yard", "Value", accent_color, value_format="₹{:,.0f}")
 
         yard_table = pd.DataFrame({
             "Yard": yard_value.index,
@@ -617,12 +655,10 @@ with tab0:
         pc1, pc2 = st.columns(2)
         with pc1:
             st.caption("Top 10 by units — highest first")
-            chart3 = prod_units_top[["Item Name", "Units"]].set_index("Item Name")
-            st.bar_chart(chart3, use_container_width=True, color=accent_color)
+            horizontal_bar_chart(prod_units_top, "Item Name", "Units", accent_color, value_format="{:,.0f} units")
         with pc2:
             st.caption("Top 10 by value (₹) — highest first")
-            chart4 = prod_value_top[["Item Name", "Value"]].set_index("Item Name")
-            st.bar_chart(chart4, use_container_width=True, color=accent_color)
+            horizontal_bar_chart(prod_value_top, "Item Name", "Value", accent_color, value_format="₹{:,.0f}")
 
         prod_table = prod_grp.sort_values("Value", ascending=False).head(20).copy()
         prod_table["Value ₹"] = prod_table["Value"].apply(lambda x: f"₹{x:,.0f}")
@@ -655,9 +691,9 @@ with tab0:
     band_120_180 = master_v[master_v["Age Bucket"] == "120–180 days"].copy()
     band_180_plus = master_v[master_v["Age Bucket"] == "180+ days"].copy()
 
-    render_age_band_section(band_120_180, "🟠 120–180 Days — Needs Action", "120-180days", "#C8923A")
-    st.markdown("<hr style='margin:2rem 0; border-color:#E5E0D8;'>", unsafe_allow_html=True)
     render_age_band_section(band_180_plus, "🔴 180+ Days — Dead Stock", "180plusdays", "#B5562B")
+    st.markdown("<hr style='margin:2rem 0; border-color:#E5E0D8;'>", unsafe_allow_html=True)
+    render_age_band_section(band_120_180, "🟠 120–180 Days — Needs Action", "120-180days", "#C8923A")
 
 
 # ══════════════════════════════════════════════
