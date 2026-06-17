@@ -460,18 +460,12 @@ with st.sidebar:
         help="ERP export of stock not moved in 60+ days. One tab per yard, or separate files per yard."
     )
     st.markdown("---")
-    dead_threshold = st.select_slider(
-        "Treat as 'Dead Stock' from:",
-        options=["60 days", "120 days", "180 days"],
-        value="180 days",
-        help="Directors typically use 180 days. Move the slider to see the impact at other thresholds."
-    )
-    st.markdown("---")
     st.caption(f"MSafe Equipments Pvt Ltd · {date.today().strftime('%d %b %Y')}")
 
-threshold_days = int(dead_threshold.split()[0])
-threshold_rank_map = {60: 0, 120: 1, 180: 2}  # an item is "dead" if its Age Rank >= this
-dead_rank_cutoff = threshold_rank_map[threshold_days]
+# Dead Stock standard, fixed at 180+ days — the threshold directors use.
+# Age Rank: 0 = 0-60d, 1 = 60-120d, 2 = 120-180d, 3 = 180+d.
+threshold_days = 180
+dead_rank_cutoff = 3
 
 # ── Banner ─────────────────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -510,9 +504,9 @@ st.markdown(f"""
 <div class="explain-box">
   <b>What you're looking at:</b> every item below is equipment that has been sitting unused
   for at least 60 days — it isn't earning rental income. The longer it sits, the more it's
-  costing us in locked-up capital. Right now, anything idle <b>{threshold_days}+ days</b> is being
-  counted as <b>"Dead Stock"</b> — money tied up with no return. You can adjust this cutoff using
-  the slider in the left panel.
+  costing us in locked-up capital. Anything idle <b>{threshold_days}+ days</b> is counted as
+  <b>"Dead Stock"</b> — money tied up with no return. This is the company-wide standard used
+  throughout this report.
 </div>
 """, unsafe_allow_html=True)
 
@@ -525,6 +519,26 @@ master_v["Is Dead"] = master_v["Age Rank"] >= dead_rank_cutoff
 dead_v = master_v[master_v["Is Dead"]].copy()
 
 # ── KPIs ────────────────────────────────────────────────────────────────────────
+# KPI 1 — the single product that has been sitting the longest (180+ days bucket),
+# aggregated across every yard it appears in. This answers "what's our worst single
+# write-off candidate" directly, by both quantity and value.
+if len(dead_v) > 0:
+    worst_product = (
+        dead_v.groupby(["Item Code", "Item Name"])
+        .agg(Qty=("Idle Qty", "sum"), Value=("Idle Value", "sum"), Yards=("Location", "nunique"))
+        .reset_index()
+        .sort_values("Value", ascending=False)
+        .iloc[0]
+    )
+    worst_name = worst_product["Item Name"]
+    worst_name_short = worst_name if len(worst_name) <= 30 else worst_name[:29] + "…"
+    worst_qty = int(worst_product["Qty"])
+    worst_value = worst_product["Value"]
+    worst_yards = int(worst_product["Yards"])
+    worst_yard_note = "in 1 yard" if worst_yards == 1 else f"combined across {worst_yards} yards"
+else:
+    worst_name_short, worst_qty, worst_value, worst_yard_note = "—", 0, 0, ""
+
 total_idle_qty   = int(master_v["Idle Qty"].sum())
 total_idle_value = master_v["Idle Value"].sum()
 dead_qty         = int(dead_v["Idle Qty"].sum())
@@ -536,19 +550,19 @@ locs_ct          = master_v["Location"].nunique()
 st.markdown(f"""
 <div class="kpi-row">
   <div class="kpi danger">
-    <div class="lbl">Dead Stock Value</div>
-    <div class="val">₹{dead_value/100000:.1f}L</div>
-    <div class="sub">idle {threshold_days}+ days · {dead_value_pct:.0f}% of all non-moving stock</div>
+    <div class="lbl">Worst single product</div>
+    <div class="val" style="font-size:1.1rem; line-height:1.3;">{worst_name_short}</div>
+    <div class="sub">{worst_qty:,} units · ₹{worst_value:,.0f} · {worst_yard_note}</div>
   </div>
   <div class="kpi danger">
-    <div class="lbl">Dead Stock Items</div>
-    <div class="val">{dead_skus}</div>
-    <div class="sub">{dead_qty:,} units across {locs_ct} yards</div>
+    <div class="lbl">Total Dead Stock (180+ days)</div>
+    <div class="val">₹{dead_value/100000:.1f}L</div>
+    <div class="sub">{dead_skus} items · {dead_qty:,} units · {dead_value_pct:.0f}% of all non-moving stock</div>
   </div>
   <div class="kpi warn">
-    <div class="lbl">All Non-Moving Stock</div>
+    <div class="lbl">All Non-Moving Stock (0–60d + 60–120d + 120–180d + 180+d combined)</div>
     <div class="val">₹{total_idle_value/100000:.1f}L</div>
-    <div class="sub">{total_idle_qty:,} units, every age bucket</div>
+    <div class="sub">{total_idle_qty:,} units · every age bucket added together</div>
   </div>
   <div class="kpi">
     <div class="lbl">Yards Reviewed</div>
