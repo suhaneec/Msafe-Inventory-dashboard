@@ -77,31 +77,41 @@ html, body { background-color: #FFFFFF !important; }
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 header[data-testid="stHeader"] { display: none; }
 
-/* ── Sidebar toggle button — visible fixed pill on left edge ── */
-/* Target every known selector across all Streamlit versions    */
+/* ── Sidebar toggle — paint the ENTIRE left-edge strip navy    ──
+   Streamlit wraps the toggle in several divs whose class names
+   change with every release. Painting all of them dark means the
+   white chevron icon inside is always visible no matter the version. */
+
+/* The outermost wrapper Streamlit puts next to the sidebar */
 [data-testid="collapsedControl"],
-[data-testid="stSidebarCollapsedControl"],
-[data-testid="stSidebarCollapsedControl"] button,
-[data-testid="collapsedControl"] button {
+[data-testid="stSidebarCollapsedControl"] {
     background-color: #1A2B3C !important;
-    border-radius: 0 8px 8px 0 !important;
-    min-width: 1.8rem !important;
-    min-height: 3rem !important;
-    box-shadow: 3px 2px 10px rgba(0,0,0,0.35) !important;
-    border: none !important;
-    opacity: 1 !important;
-    visibility: visible !important;
+    min-width: 2rem !important;
+    min-height: 100vh !important;
     display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 4px 0 12px rgba(0,0,0,0.3) !important;
 }
+/* Every button and div inside that wrapper */
+[data-testid="collapsedControl"] *,
+[data-testid="stSidebarCollapsedControl"] * {
+    background-color: #1A2B3C !important;
+    color: #FFFFFF !important;
+}
+/* The SVG chevron itself */
 [data-testid="collapsedControl"] svg,
-[data-testid="stSidebarCollapsedControl"] svg,
-[data-testid="collapsedControl"] button svg,
-[data-testid="stSidebarCollapsedControl"] button svg {
+[data-testid="stSidebarCollapsedControl"] svg {
     fill: #FFFFFF !important;
     stroke: #FFFFFF !important;
     color: #FFFFFF !important;
-    opacity: 1 !important;
 }
+[data-testid="collapsedControl"] path,
+[data-testid="stSidebarCollapsedControl"] path {
+    fill: #FFFFFF !important;
+    stroke: #FFFFFF !important;
+}
+/* Hover: turn orange */
 [data-testid="collapsedControl"]:hover,
 [data-testid="stSidebarCollapsedControl"]:hover,
 [data-testid="collapsedControl"] button:hover,
