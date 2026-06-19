@@ -15,9 +15,10 @@ st.markdown("""
 /* ══════════════════════════════════════════════════════════════════
    FORCE THE WHOLE APP TO A FIXED LIGHT THEME — independent of any
    Streamlit Cloud theme setting, browser dark mode, or system
-   preference. Every rule below targets Streamlit's actual root
-   containers directly with !important, so this dashboard cannot
-   end up dark-background-with-dark-text no matter where it's hosted.
+   preference. Every Streamlit root container, widget, and chart
+   surface is targeted directly with !important so nothing can render
+   as dark-on-dark or white-on-white anywhere in the app, including the
+   sidebar, multiselect chips, dataframes, and embedded Vega charts.
    ══════════════════════════════════════════════════════════════════ */
 html, body { background-color: #FFFFFF !important; }
 
@@ -30,6 +31,15 @@ html, body { background-color: #FFFFFF !important; }
 }
 
 [data-testid="stHeader"] { background-color: transparent !important; }
+
+/* Full width — no fixed max-width column, minimal side padding only */
+.block-container {
+    padding-top: 1.2rem;
+    padding-bottom: 2rem;
+    padding-left: 2.2rem;
+    padding-right: 2.2rem;
+    max-width: 100% !important;
+}
 
 /* Every generic text-bearing element in the main content area defaults
    to dark text on the white background above, unless a specific rule
@@ -57,18 +67,41 @@ html, body { background-color: #FFFFFF !important; }
     border-color: #E5E0D8 !important;
 }
 
-/* Dataframes / tables */
+/* Dropdown popover menus (rendered in a portal, not inside stMain) */
+[data-baseweb="popover"] [data-baseweb="menu"],
+[data-baseweb="popover"] ul,
+[role="listbox"] {
+    background-color: #FFFFFF !important;
+}
+[data-baseweb="popover"] [data-baseweb="menu"] li,
+[role="listbox"] li,
+[role="option"] {
+    background-color: #FFFFFF !important;
+    color: #1A2B3C !important;
+}
+[role="option"]:hover, [role="option"][aria-selected="true"] {
+    background-color: #F4F1EA !important;
+    color: #1A2B3C !important;
+}
+
+/* Dataframes / tables — force light surface + dark text everywhere,
+   including the canvas-rendered glide-data-grid cells Streamlit uses */
 [data-testid="stDataFrame"] { background-color: #FFFFFF !important; }
+[data-testid="stDataFrame"] * { color: #1A2B3C !important; }
+
+/* st.dataframe column headers */
+[data-testid="stDataFrame"] [data-testid="stDataFrameResizable"] {
+    background-color: #FFFFFF !important;
+}
 
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 header[data-testid="stHeader"] { display: none; }
-.block-container { padding-top: 1.4rem; max-width: 1200px; }
 
 /* ── Banner ─────────────────────────────────────────────── */
 .banner {
     background: linear-gradient(135deg, #1A2B3C 0%, #0F1B26 100%);
     color: #fff;
-    padding: 1.6rem 2rem;
+    padding: 1.6rem 2.2rem;
     border-radius: 10px;
     margin-bottom: 1.6rem;
 }
@@ -98,31 +131,56 @@ header[data-testid="stHeader"] { display: none; }
     line-height: 1.55;
     border-left: 4px solid #B5562B;
 }
+.explain-box * { color: #3A3530 !important; }
 .explain-box b { color: #1A2B3C !important; }
 
-/* ── KPI cards ─────────────────────────────────────────────── */
+/* ── KPI cards — redesigned for at-a-glance reading ───────────
+   Number is the dominant element on every card (largest, boldest,
+   tabular numerals via DM Mono so digits align). Label is a short
+   plain-English phrase, never a run-on description. Supporting
+   detail is a single short line, not a paragraph. */
 .kpi-row { display: flex; gap: 1rem; margin-bottom: 1.6rem; flex-wrap: wrap; }
 .kpi {
     background: #fff;
     border: 1px solid #E5E0D8;
+    border-left: 4px solid #D8D2C6;
     border-radius: 10px;
-    padding: 1.1rem 1.3rem;
+    padding: 1.15rem 1.3rem;
     flex: 1;
-    min-width: 160px;
+    min-width: 220px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 .kpi .lbl {
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.74rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
     color: #8A8378 !important;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
-.kpi .val { font-family: 'Fraunces', serif; font-size: 1.9rem; font-weight: 600; color: #1A2B3C !important; line-height: 1; }
-.kpi .sub { font-size: 0.76rem; color: #9B9488 !important; margin-top: 5px; }
-.kpi.danger .val { color: #B5562B !important; }
+.kpi .val {
+    font-family: 'DM Mono', monospace;
+    font-size: 2.1rem;
+    font-weight: 500;
+    color: #1A2B3C !important;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+}
+.kpi .val-name {
+    font-family: 'Fraunces', serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #1A2B3C !important;
+    line-height: 1.3;
+}
+.kpi .sub { font-size: 0.8rem; color: #6B6458 !important; margin-top: 7px; }
+.kpi .sub b { color: #3A3530 !important; }
+.kpi.danger { border-left-color: #B5562B; }
+.kpi.danger .val, .kpi.danger .val-name { color: #B5562B !important; }
+.kpi.warn { border-left-color: #C8923A; }
 .kpi.warn .val { color: #C8923A !important; }
+.kpi.neutral { border-left-color: #4C7A9A; }
+.kpi.neutral .val { color: #2D5573 !important; }
 
 /* ── Section headers ───────────────────────────────────────── */
 .sec-title {
@@ -147,6 +205,12 @@ header[data-testid="stHeader"] { display: none; }
     color: #1A2B3C !important;
     margin: 1.3rem 0 0.7rem 0;
 }
+.chart-caption {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6B6458 !important;
+    margin-bottom: 0.4rem;
+}
 
 /* ── Severity legend chips ─────────────────────────────────── */
 .legend-row { display: flex; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; }
@@ -170,31 +234,62 @@ header[data-testid="stHeader"] { display: none; }
     background: #FCE9E3; border-left: 4px solid #B5562B; border-radius: 0 8px 8px 0;
     padding: 0.85rem 1.1rem; font-size: 0.85rem; color: #6B3119 !important; margin-bottom: 1rem;
 }
+.alert-box * { color: #6B3119 !important; }
 
-/* ── Sidebar ───────────────────────────────────────────────── */
-section[data-testid="stSidebar"] { background: #1A2B3C !important; }
+/* ── Sidebar — fixed dark surface, light text, every nested
+   widget forced to match so nothing flips white-on-white ───── */
+section[data-testid="stSidebar"] {
+    background: #1A2B3C !important;
+    min-width: 280px !important;
+}
 section[data-testid="stSidebar"] * { color: #C7CDD3 !important; }
-section[data-testid="stSidebar"] h2 { color: #fff !important; font-family: 'Fraunces', serif; font-size: 1rem; }
-section[data-testid="stSidebar"] [data-baseweb="select"] > div,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3 { color: #fff !important; font-family: 'Fraunces', serif; font-size: 1rem; }
+
+/* Sidebar select / multiselect control surface */
+section[data-testid="stSidebar"] [data-baseweb="select"] > div {
+    background-color: #243648 !important;
+    color: #fff !important;
+    border-color: #354A60 !important;
+}
 section[data-testid="stSidebar"] input {
     background-color: #243648 !important;
     color: #fff !important;
+}
+/* Selected multiselect chips/tags inside the sidebar */
+section[data-testid="stSidebar"] [data-baseweb="tag"] {
+    background-color: #B5562B !important;
+    border-color: #B5562B !important;
+}
+section[data-testid="stSidebar"] [data-baseweb="tag"] * {
+    color: #fff !important;
+    fill: #fff !important;
+}
+/* File uploader card in sidebar */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+    background-color: #243648 !important;
+    border-color: #354A60 !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
+    background-color: #243648 !important;
 }
 
 /* Tabs */
 .stTabs [data-baseweb="tab-list"] { gap: 4px; background: transparent; }
 .stTabs [data-baseweb="tab"] {
-    font-weight: 600; font-size: 0.88rem; color: #6B6458 !important;
-    background: #F4F1EA; border-radius: 8px 8px 0 0; padding: 0.5rem 1rem;
+    font-weight: 600; font-size: 0.92rem; color: #6B6458 !important;
+    background: #F4F1EA; border-radius: 8px 8px 0 0; padding: 0.55rem 1.1rem;
 }
 .stTabs [aria-selected="true"] {
     color: #1A2B3C !important; background: #fff !important;
     border-bottom: 3px solid #B5562B !important;
 }
 .stTabs [data-baseweb="tab"] p { color: inherit !important; }
+
+/* Expander headers */
+[data-testid="stExpander"] summary { color: #1A2B3C !important; }
 </style>
 """, unsafe_allow_html=True)
-
 
 
 # ── Pure stdlib xlsx reader (no openpyxl / xlrd needed for reading) ───────────
@@ -524,7 +619,7 @@ def horizontal_bar_chart(df, label_col, value_col, accent_color, value_format="�
                 axis=alt.Axis(labels=False, grid=False, ticks=False, domain=False)),
         y=alt.Y("_label_full:N", sort="-x", title=None,
                 axis=alt.Axis(labelLimit=label_limit_px, labelFontSize=13,
-                               labelColor="#3A3530", labelFontWeight=500)),
+                               labelColor="#1A2B3C", labelFontWeight=500)),
         tooltip=[alt.Tooltip("_label_full:N", title="Item"),
                  alt.Tooltip(f"{value_col}:Q", title="Value", format=",.0f")],
     )
@@ -535,12 +630,18 @@ def horizontal_bar_chart(df, label_col, value_col, accent_color, value_format="�
     # width="container" tells Vega-Lite itself to fill its parent's actual pixel
     # width before computing the scale/layout — this is the setting Altair needs
     # so the chart's internal coordinates match what Streamlit stretches it to.
-    # clip=False + a few pixels of padding stop the very top bar's value label
-    # (which sits flush against the chart's top edge) from being cut off — this
-    # was happening specifically to row 1 in narrow side-by-side columns.
+    # background/text colors are pinned explicitly (not inherited) so the chart
+    # always renders dark text on a light surface regardless of any surrounding
+    # theme — this is what was causing numbers/labels to disappear before.
     chart = (bars + text).properties(
         height=max(34 * len(chart_df), 140), width="container", padding={"top": 6, "right": 12, "bottom": 4, "left": 4}
-    ).configure_view(strokeWidth=0, fill="#FAF8F4", clip=False).configure(background="#FAF8F4")
+    ).configure_view(strokeWidth=0, fill="#FAF8F4", clip=False).configure(
+        background="#FAF8F4"
+    ).configure_axis(
+        labelColor="#1A2B3C", titleColor="#1A2B3C"
+    ).configure_text(
+        color="#1A2B3C"
+    )
 
     st.altair_chart(chart, width="stretch", theme=None)
 
@@ -627,13 +728,13 @@ if len(dead_v) > 0:
         .iloc[0]
     )
     worst_name = worst_product["Item Name"]
-    worst_name_short = worst_name if len(worst_name) <= 30 else worst_name[:29] + "…"
+    worst_name_short = worst_name if len(worst_name) <= 34 else worst_name[:33] + "…"
     worst_qty = int(worst_product["Qty"])
     worst_value = worst_product["Value"]
     worst_yards = int(worst_product["Yards"])
-    worst_yard_note = "in 1 yard" if worst_yards == 1 else f"combined across {worst_yards} yards"
+    worst_yard_note = "1 yard" if worst_yards == 1 else f"{worst_yards} yards"
 else:
-    worst_name_short, worst_qty, worst_value, worst_yard_note = "—", 0, 0, ""
+    worst_name_short, worst_qty, worst_value, worst_yard_note = "—", 0, 0, "—"
 
 total_idle_qty   = int(master_v["Idle Qty"].sum())
 total_idle_value = master_v["Idle Value"].sum()
@@ -643,27 +744,30 @@ dead_value_pct   = dead_value / total_idle_value * 100 if total_idle_value else 
 dead_skus        = len(dead_v)
 locs_ct          = master_v["Location"].nunique()
 
+# Cards redesigned so the number you need is the biggest, boldest thing on the
+# card every time — short plain-English label above it, one short supporting
+# line below. No long run-on labels competing with the number for attention.
 st.markdown(f"""
 <div class="kpi-row">
   <div class="kpi danger">
     <div class="lbl">Worst single product</div>
-    <div class="val" style="font-size:1.1rem; line-height:1.3;">{worst_name_short}</div>
-    <div class="sub">{worst_qty:,} units · ₹{worst_value:,.0f} · {worst_yard_note}</div>
+    <div class="val-name">{worst_name_short}</div>
+    <div class="sub">₹{worst_value:,.0f} locked up · <b>{worst_qty:,} units</b> · in {worst_yard_note}</div>
   </div>
   <div class="kpi danger">
-    <div class="lbl">Total Dead Stock (180+ days)</div>
+    <div class="lbl">Dead stock value (180+ days)</div>
     <div class="val">₹{dead_value/100000:.1f}L</div>
-    <div class="sub">{dead_skus} items · {dead_qty:,} units · {dead_value_pct:.0f}% of all non-moving stock</div>
+    <div class="sub"><b>{dead_skus} items</b> · {dead_qty:,} units · {dead_value_pct:.0f}% of all non-moving stock</div>
   </div>
   <div class="kpi warn">
-    <div class="lbl">All Non-Moving Stock (0–60d + 60–120d + 120–180d + 180+d combined)</div>
+    <div class="lbl">Total non-moving stock value</div>
     <div class="val">₹{total_idle_value/100000:.1f}L</div>
-    <div class="sub">{total_idle_qty:,} units · every age bucket added together</div>
+    <div class="sub"><b>{total_idle_qty:,} units</b> · all age bands combined (0–60d → 180+d)</div>
   </div>
-  <div class="kpi">
-    <div class="lbl">Yards Reviewed</div>
+  <div class="kpi neutral">
+    <div class="lbl">Yards reviewed</div>
     <div class="val">{locs_ct}</div>
-    <div class="sub">{len(master_v)} item-lines checked</div>
+    <div class="sub"><b>{len(master_v):,} item-lines</b> checked in total</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -681,135 +785,137 @@ st.markdown("""
 RAG_COLOR = {"0–60 days": "🟢", "60–120 days": "🟡", "120–180 days": "🟠", "180+ days": "🔴"}
 
 
-# ── Tabs ────────────────────────────────────────────────────────────────────────
-tab0, tab1, tab2 = st.tabs([
-    "📊 Director Summary", "🏭 By Yard", "🔁 Repeat Offenders"
+def render_age_band_body(band_df, band_label, band_key, accent_color):
+    """Renders: yard chart+table, then product chart+table, both units & value, high to low."""
+    if len(band_df) == 0:
+        st.info(f"No items fall in the {band_label.lower()} band.")
+        return
+
+    band_qty   = int(band_df["Idle Qty"].sum())
+    band_value = band_df["Idle Value"].sum()
+    st.markdown(f"""
+    <div class="kpi-row" style="margin-bottom:1.1rem;">
+      <div class="kpi">
+        <div class="lbl">Items in this band</div>
+        <div class="val">{len(band_df):,}</div>
+        <div class="sub"><b>{band_qty:,} units</b></div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">Value locked up</div>
+        <div class="val">₹{band_value/100000:.1f}L</div>
+        <div class="sub">in this age band alone</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Yard-wise: units and value, both high to low ───────────────────────
+    st.markdown(f'<div class="chart-heading">Which yard has the most dead inventory</div>', unsafe_allow_html=True)
+
+    yard_units = band_df.groupby("Location")["Idle Qty"].sum().sort_values(ascending=False)
+    yard_value = band_df.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
+
+    yc1, yc2 = st.columns(2)
+    with yc1:
+        st.markdown('<div class="chart-caption">By units — highest first</div>', unsafe_allow_html=True)
+        chart1 = yard_units.reset_index()
+        chart1.columns = ["Yard", "Units"]
+        horizontal_bar_chart(chart1, "Yard", "Units", accent_color, value_format="{:,.0f} units")
+    with yc2:
+        st.markdown('<div class="chart-caption">By value (₹) — highest first</div>', unsafe_allow_html=True)
+        chart2 = yard_value.reset_index()
+        chart2.columns = ["Yard", "Value"]
+        horizontal_bar_chart(chart2, "Yard", "Value", accent_color, value_format="₹{:,.0f}")
+
+    yard_table = pd.DataFrame({
+        "Yard": yard_value.index,
+        "Value ₹": yard_value.values,
+    }).merge(
+        pd.DataFrame({"Yard": yard_units.index, "Units": yard_units.values}),
+        on="Yard"
+    ).sort_values("Value ₹", ascending=False)
+    yard_table["Value ₹"] = yard_table["Value ₹"].apply(lambda x: f"₹{x:,.0f}")
+    yard_table["Units"] = yard_table["Units"].astype(int)
+    yard_table.insert(0, "Rank", range(1, len(yard_table) + 1))
+
+    st.dataframe(yard_table[["Rank", "Yard", "Units", "Value ₹"]], width="stretch", hide_index=True)
+
+    # ── Product-wise: units and value, both high to low ────────────────────
+    st.markdown(f'<div class="chart-heading">Which product is dead the most</div>', unsafe_allow_html=True)
+
+    prod_grp = band_df.groupby(["Item Code", "Item Name"]).agg(
+        Units=("Idle Qty", "sum"),
+        Value=("Idle Value", "sum"),
+        Yards=("Location", "nunique"),
+    ).reset_index()
+
+    prod_units_top = prod_grp.sort_values("Units", ascending=False).head(10)
+    prod_value_top = prod_grp.sort_values("Value", ascending=False).head(10)
+
+    pc1, pc2 = st.columns(2)
+    with pc1:
+        st.markdown('<div class="chart-caption">Top 10 by units — highest first</div>', unsafe_allow_html=True)
+        horizontal_bar_chart(prod_units_top, "Item Name", "Units", accent_color, value_format="{:,.0f} units")
+    with pc2:
+        st.markdown('<div class="chart-caption">Top 10 by value (₹) — highest first</div>', unsafe_allow_html=True)
+        horizontal_bar_chart(prod_value_top, "Item Name", "Value", accent_color, value_format="₹{:,.0f}")
+
+    prod_table = prod_grp.sort_values("Value", ascending=False).head(20).copy()
+    prod_table["Value ₹"] = prod_table["Value"].apply(lambda x: f"₹{x:,.0f}")
+    prod_table["Units"] = prod_table["Units"].astype(int)
+    prod_table.insert(0, "Rank", range(1, len(prod_table) + 1))
+
+    st.dataframe(
+        prod_table[["Rank", "Item Code", "Item Name", "Yards", "Units", "Value ₹"]].rename(
+            columns={"Yards": "# Yards Affected"}
+        ),
+        width="stretch", hide_index=True
+    )
+
+    # ── Download for this band ──────────────────────────────────────────────
+    export_sheets = {
+        f"{band_key} - By Yard": df_to_rows(yard_table[["Rank", "Yard", "Units", "Value ₹"]]),
+        f"{band_key} - By Product": df_to_rows(
+            prod_table[["Rank", "Item Code", "Item Name", "Yards", "Units", "Value ₹"]]
+        ),
+    }
+    buf = write_xlsx_stdlib(export_sheets)
+    st.download_button(
+        f"⬇️  Download {band_label} report (.xlsx)",
+        data=buf,
+        file_name=f"MSafe_{band_key}_{date.today()}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key=f"download_{band_key}",
+    )
+
+
+band_120_180 = master_v[master_v["Age Bucket"] == "120–180 days"].copy()
+band_180_plus = master_v[master_v["Age Bucket"] == "180+ days"].copy()
+
+# ── Top-level tabs ─────────────────────────────────────────────────────────────
+# 180+ days and 120-180 days are now fully separate tabs (rather than stacked
+# sections on one long page), each followed by the By-Yard and Repeat-Offenders
+# views scoped to that same age band — so a director can stay inside one age
+# band the whole time instead of scrolling past the other one to get there.
+tab_180, tab_120, tab_byyard, tab_repeat = st.tabs([
+    "🔴 180+ Days — Dead Stock", "🟠 120–180 Days — Needs Action",
+    "🏭 By Yard (All Bands)", "🔁 Repeat Offenders (All Bands)"
 ])
 
+with tab_180:
+    st.markdown('<div class="sec-title">🔴 180+ Days — Dead Stock</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">Money tied up the longest, with no return — the company-wide write-off candidates</div>', unsafe_allow_html=True)
+    render_age_band_body(band_180_plus, "180+ Days — Dead Stock", "180plusdays", "#B5562B")
 
-# ══════════════════════════════════════════════
-# TAB 0 — Director Summary (split by age band)
-# ══════════════════════════════════════════════
-with tab0:
-    st.markdown('<div class="sec-title">Dead stock, split by how long it has been sitting</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Two age bands below — each shows which yard is worst, and which product is worst, by units and by value</div>', unsafe_allow_html=True)
-
-    def render_age_band_section(band_df, band_label, band_key, accent_color):
-        """Renders: yard chart+table, then product chart+table, both units & value, high to low."""
-        st.markdown(f'<div class="sec-title">{band_label}</div>', unsafe_allow_html=True)
-
-        if len(band_df) == 0:
-            st.info(f"No items fall in the {band_label.lower()} band.")
-            return
-
-        band_qty   = int(band_df["Idle Qty"].sum())
-        band_value = band_df["Idle Value"].sum()
-        st.markdown(f"""
-        <div class="kpi-row" style="margin-bottom:1.1rem;">
-          <div class="kpi">
-            <div class="lbl">Items in this band</div>
-            <div class="val">{len(band_df)}</div>
-            <div class="sub">{band_qty:,} units</div>
-          </div>
-          <div class="kpi">
-            <div class="lbl">Value locked up</div>
-            <div class="val">₹{band_value/100000:.1f}L</div>
-            <div class="sub">in this age band alone</div>
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # ── Yard-wise: units and value, both high to low ───────────────────────
-        st.markdown(f'<div class="chart-heading">Which yard has the most dead inventory</div>', unsafe_allow_html=True)
-
-        yard_units = band_df.groupby("Location")["Idle Qty"].sum().sort_values(ascending=False)
-        yard_value = band_df.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
-
-        yc1, yc2 = st.columns(2)
-        with yc1:
-            st.caption("By units — highest first")
-            chart1 = yard_units.reset_index()
-            chart1.columns = ["Yard", "Units"]
-            horizontal_bar_chart(chart1, "Yard", "Units", accent_color, value_format="{:,.0f} units")
-        with yc2:
-            st.caption("By value (₹) — highest first")
-            chart2 = yard_value.reset_index()
-            chart2.columns = ["Yard", "Value"]
-            horizontal_bar_chart(chart2, "Yard", "Value", accent_color, value_format="₹{:,.0f}")
-
-        yard_table = pd.DataFrame({
-            "Yard": yard_value.index,
-            "Value ₹": yard_value.values,
-        }).merge(
-            pd.DataFrame({"Yard": yard_units.index, "Units": yard_units.values}),
-            on="Yard"
-        ).sort_values("Value ₹", ascending=False)
-        yard_table["Value ₹"] = yard_table["Value ₹"].apply(lambda x: f"₹{x:,.0f}")
-        yard_table["Units"] = yard_table["Units"].astype(int)
-        yard_table.insert(0, "Rank", range(1, len(yard_table) + 1))
-
-        st.dataframe(yard_table[["Rank", "Yard", "Units", "Value ₹"]], width="stretch", hide_index=True)
-
-        # ── Product-wise: units and value, both high to low ────────────────────
-        st.markdown(f'<div class="chart-heading">Which product is dead the most</div>', unsafe_allow_html=True)
-
-        prod_grp = band_df.groupby(["Item Code", "Item Name"]).agg(
-            Units=("Idle Qty", "sum"),
-            Value=("Idle Value", "sum"),
-            Yards=("Location", "nunique"),
-        ).reset_index()
-
-        prod_units_top = prod_grp.sort_values("Units", ascending=False).head(10)
-        prod_value_top = prod_grp.sort_values("Value", ascending=False).head(10)
-
-        pc1, pc2 = st.columns(2)
-        with pc1:
-            st.caption("Top 10 by units — highest first")
-            horizontal_bar_chart(prod_units_top, "Item Name", "Units", accent_color, value_format="{:,.0f} units")
-        with pc2:
-            st.caption("Top 10 by value (₹) — highest first")
-            horizontal_bar_chart(prod_value_top, "Item Name", "Value", accent_color, value_format="₹{:,.0f}")
-
-        prod_table = prod_grp.sort_values("Value", ascending=False).head(20).copy()
-        prod_table["Value ₹"] = prod_table["Value"].apply(lambda x: f"₹{x:,.0f}")
-        prod_table["Units"] = prod_table["Units"].astype(int)
-        prod_table.insert(0, "Rank", range(1, len(prod_table) + 1))
-
-        st.dataframe(
-            prod_table[["Rank", "Item Code", "Item Name", "Yards", "Units", "Value ₹"]].rename(
-                columns={"Yards": "# Yards Affected"}
-            ),
-            width="stretch", hide_index=True
-        )
-
-        # ── Download for this band ──────────────────────────────────────────────
-        export_sheets = {
-            f"{band_key} - By Yard": df_to_rows(yard_table[["Rank", "Yard", "Units", "Value ₹"]]),
-            f"{band_key} - By Product": df_to_rows(
-                prod_table[["Rank", "Item Code", "Item Name", "Yards", "Units", "Value ₹"]]
-            ),
-        }
-        buf = write_xlsx_stdlib(export_sheets)
-        st.download_button(
-            f"⬇️  Download {band_label} report (.xlsx)",
-            data=buf,
-            file_name=f"MSafe_{band_key}_{date.today()}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key=f"download_{band_key}",
-        )
-
-    band_120_180 = master_v[master_v["Age Bucket"] == "120–180 days"].copy()
-    band_180_plus = master_v[master_v["Age Bucket"] == "180+ days"].copy()
-
-    render_age_band_section(band_180_plus, "🔴 180+ Days — Dead Stock", "180plusdays", "#B5562B")
-    st.markdown("<hr style='margin:2rem 0; border-color:#E5E0D8;'>", unsafe_allow_html=True)
-    render_age_band_section(band_120_180, "🟠 120–180 Days — Needs Action", "120-180days", "#C8923A")
+with tab_120:
+    st.markdown('<div class="sec-title">🟠 120–180 Days — Needs Action</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">About to cross into Dead Stock — the window to act is closing</div>', unsafe_allow_html=True)
+    render_age_band_body(band_120_180, "120–180 Days — Needs Action", "120-180days", "#C8923A")
 
 
 # ══════════════════════════════════════════════
-# TAB 1 — By Yard
+# TAB — By Yard
 # ══════════════════════════════════════════════
-with tab1:
+with tab_byyard:
     st.markdown('<div class="sec-title">Dead stock, yard by yard</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="sec-sub">Worst yards first — based on the {threshold_days}-day cutoff</div>', unsafe_allow_html=True)
 
@@ -853,9 +959,9 @@ with tab1:
 
 
 # ══════════════════════════════════════════════
-# TAB 2 — Repeat Offenders (multi-yard dead items)
+# TAB — Repeat Offenders (multi-yard dead items)
 # ══════════════════════════════════════════════
-with tab2:
+with tab_repeat:
     st.markdown('<div class="sec-title">Items dead in many yards at once</div>', unsafe_allow_html=True)
     st.markdown('<div class="sec-sub">These point to a company-wide issue with the item — not just one yard\'s problem</div>', unsafe_allow_html=True)
 
@@ -897,6 +1003,3 @@ with tab2:
             file_name=f"MSafe_RepeatOffenders_{date.today()}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-
-
-# ══════════════════════════════════════════════
