@@ -12,14 +12,6 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500..700&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap');
 
-/* ══════════════════════════════════════════════════════════════════
-   FORCE THE WHOLE APP TO A FIXED LIGHT THEME — independent of any
-   Streamlit Cloud theme setting, browser dark mode, or system
-   preference. Every Streamlit root container, widget, and chart
-   surface is targeted directly with !important so nothing can render
-   as dark-on-dark or white-on-white anywhere in the app, including the
-   sidebar, multiselect chips, dataframes, and embedded Vega charts.
-   ══════════════════════════════════════════════════════════════════ */
 html, body { background-color: #FFFFFF !important; }
 
 [data-testid="stAppViewContainer"],
@@ -32,7 +24,6 @@ html, body { background-color: #FFFFFF !important; }
 
 [data-testid="stHeader"] { background-color: transparent !important; }
 
-/* Full width — no fixed max-width column, minimal side padding only */
 .block-container {
     padding-top: 1.2rem;
     padding-bottom: 2rem;
@@ -41,9 +32,6 @@ html, body { background-color: #FFFFFF !important; }
     max-width: 100% !important;
 }
 
-/* Every generic text-bearing element in the main content area defaults
-   to dark text on the white background above, unless a specific rule
-   below (KPI cards, banner, sidebar, etc.) overrides it intentionally. */
 [data-testid="stMain"] p,
 [data-testid="stMain"] span,
 [data-testid="stMain"] div,
@@ -56,9 +44,6 @@ html, body { background-color: #FFFFFF !important; }
     color: #1A2B3C;
 }
 
-/* Streamlit's native widgets (selectbox, multiselect, text input, etc.)
-   in the main area — force light surfaces so dropdowns/inputs never
-   render as dark-on-dark either. */
 [data-testid="stMain"] [data-baseweb="select"] > div,
 [data-testid="stMain"] input,
 [data-testid="stMain"] textarea {
@@ -67,7 +52,6 @@ html, body { background-color: #FFFFFF !important; }
     border-color: #E5E0D8 !important;
 }
 
-/* Dropdown popover menus (rendered in a portal, not inside stMain) */
 [data-baseweb="popover"] [data-baseweb="menu"],
 [data-baseweb="popover"] ul,
 [role="listbox"] {
@@ -84,18 +68,34 @@ html, body { background-color: #FFFFFF !important; }
     color: #1A2B3C !important;
 }
 
-/* Dataframes / tables — force light surface + dark text everywhere,
-   including the canvas-rendered glide-data-grid cells Streamlit uses */
 [data-testid="stDataFrame"] { background-color: #FFFFFF !important; }
 [data-testid="stDataFrame"] * { color: #1A2B3C !important; }
 
-/* st.dataframe column headers */
 [data-testid="stDataFrame"] [data-testid="stDataFrameResizable"] {
     background-color: #FFFFFF !important;
 }
 
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 header[data-testid="stHeader"] { display: none; }
+
+/* ── Sidebar collapse/expand toggle button ──────────────────────────────────
+   When the sidebar is collapsed the toggle arrow sits on a white background
+   and becomes invisible. Force it to a high-contrast dark pill so directors
+   can always see and click it to open the filters pane. */
+[data-testid="collapsedControl"] {
+    background-color: #1A2B3C !important;
+    border-radius: 0 8px 8px 0 !important;
+    padding: 0.5rem 0.4rem !important;
+    box-shadow: 2px 2px 6px rgba(0,0,0,0.18) !important;
+}
+[data-testid="collapsedControl"] svg {
+    fill: #FFFFFF !important;
+    stroke: #FFFFFF !important;
+    color: #FFFFFF !important;
+}
+[data-testid="collapsedControl"]:hover {
+    background-color: #B5562B !important;
+}
 
 /* ── Banner ─────────────────────────────────────────────── */
 .banner {
@@ -134,11 +134,7 @@ header[data-testid="stHeader"] { display: none; }
 .explain-box * { color: #3A3530 !important; }
 .explain-box b { color: #1A2B3C !important; }
 
-/* ── KPI cards — redesigned for at-a-glance reading ───────────
-   Number is the dominant element on every card (largest, boldest,
-   tabular numerals via DM Mono so digits align). Label is a short
-   plain-English phrase, never a run-on description. Supporting
-   detail is a single short line, not a paragraph. */
+/* ── KPI cards ───────────────────────────────────────────── */
 .kpi-row { display: flex; gap: 1rem; margin-bottom: 1.6rem; flex-wrap: wrap; }
 .kpi {
     background: #fff;
@@ -236,8 +232,7 @@ header[data-testid="stHeader"] { display: none; }
 }
 .alert-box * { color: #6B3119 !important; }
 
-/* ── Sidebar — fixed dark surface, light text, every nested
-   widget forced to match so nothing flips white-on-white ───── */
+/* ── Sidebar ─────────────────────────────────────────────── */
 section[data-testid="stSidebar"] {
     background: #1A2B3C !important;
     min-width: 280px !important;
@@ -246,7 +241,6 @@ section[data-testid="stSidebar"] * { color: #C7CDD3 !important; }
 section[data-testid="stSidebar"] h2,
 section[data-testid="stSidebar"] h3 { color: #fff !important; font-family: 'Fraunces', serif; font-size: 1rem; }
 
-/* Sidebar select / multiselect control surface */
 section[data-testid="stSidebar"] [data-baseweb="select"] > div {
     background-color: #243648 !important;
     color: #fff !important;
@@ -256,7 +250,6 @@ section[data-testid="stSidebar"] input {
     background-color: #243648 !important;
     color: #fff !important;
 }
-/* Selected multiselect chips/tags inside the sidebar */
 section[data-testid="stSidebar"] [data-baseweb="tag"] {
     background-color: #B5562B !important;
     border-color: #B5562B !important;
@@ -265,7 +258,6 @@ section[data-testid="stSidebar"] [data-baseweb="tag"] * {
     color: #fff !important;
     fill: #fff !important;
 }
-/* File uploader card in sidebar */
 section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
     background-color: #243648 !important;
     border-color: #354A60 !important;
@@ -292,7 +284,7 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
 """, unsafe_allow_html=True)
 
 
-# ── Pure stdlib xlsx reader (no openpyxl / xlrd needed for reading) ───────────
+# ── Pure stdlib xlsx reader ────────────────────────────────────────────────────
 NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 RID_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -399,8 +391,6 @@ def to_num(v):
 
 
 def extract_full_location_name(header_row, tab_name):
-    """Full godown name sits somewhere in row 1, often column L or N. Column A
-    is skipped — at least one real sheet had a stray/incorrect label there."""
     best = None
     for i, cell in enumerate(header_row):
         if i == 0:
@@ -419,18 +409,6 @@ def extract_full_location_name(header_row, tab_name):
 
 
 def parse_location_sheet(rows, tab_name):
-    """
-    Every row in this export is ALREADY non-moving stock (60+ days idle) —
-    the file itself is pre-filtered by the ERP. The age buckets tell us HOW
-    idle each item is, not whether it's idle at all.
-
-    Columns (0-indexed):
-      2: Total Qty (= idle qty)   3: Total Amt (= idle value)
-      4/5  : Qty/Amt idle 0-60 days
-      6/7  : Qty/Amt idle 60-120 days
-      8/9  : Qty/Amt idle 120-180 days
-      10/11: Qty/Amt idle 180+ days   (present on most tabs, missing on 3 of them)
-    """
     if len(rows) < 3:
         return None
 
@@ -444,7 +422,7 @@ def parse_location_sheet(rows, tab_name):
         row = list(row) + [None] * max(0, 12 - len(row))
         item_code = row[0]
         if item_code is None or str(item_code).strip() == "":
-            break  # totals row reached
+            break
 
         records.append({
             "Item Code"   : str(item_code).strip(),
@@ -467,7 +445,6 @@ def parse_location_sheet(rows, tab_name):
 
     df = pd.DataFrame(records)
 
-    # Worst (oldest) bucket an item falls into — this is its age classification
     def _age_bucket(r):
         if r["Qty_180_plus"] > 0:
             return "180+ days"
@@ -477,8 +454,7 @@ def parse_location_sheet(rows, tab_name):
             return "60–120 days"
         if r["Qty_0_60"] > 0:
             return "0–60 days"
-        return "180+ days"  # fallback: NF2/NF3/NU4 sheets with no >180 column,
-                              # qty present but bucket columns all blank/zero
+        return "180+ days"
 
     df["Age Bucket"] = df.apply(_age_bucket, axis=1)
     bucket_rank = {"0–60 days": 0, "60–120 days": 1, "120–180 days": 2, "180+ days": 3}
@@ -504,7 +480,7 @@ def parse_uploaded_file(file_bytes, filename):
     return dfs, errs
 
 
-# ── Minimal stdlib xlsx writer (no openpyxl needed) ────────────────────────────
+# ── Minimal stdlib xlsx writer ─────────────────────────────────────────────────
 def _sheet_xml(rows):
     out = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
@@ -583,34 +559,13 @@ def df_to_rows(df):
 
 
 def horizontal_bar_chart(df, label_col, value_col, accent_color, value_format="₹{:,.0f}"):
-    """
-    A clean, easy-to-read horizontal bar chart — longest bar on top, value labels
-    printed at the end of each bar, sized up for readability. Uses Altair (ships
-    with Streamlit, no extra install) instead of st.bar_chart, since vertical bars
-    with long product names become unreadable.
-
-    Full item/yard names are always shown — never truncated — since directors
-    need to read the exact product name without hovering for a tooltip.
-
-    Value labels sit just past the end of each bar, on the chart's own fixed
-    light background — this keeps them legible regardless of whether the
-    surrounding page is light or dark themed, and avoids the failure case where
-    a short bar (e.g. Punjab: ₹44,650) is too thin to fit text inside it next to
-    a long bar (e.g. Mumbai: ₹1.2 Cr).
-    """
     chart_df = df.copy()
     chart_df["_label_full"] = chart_df[label_col].astype(str)
     chart_df["_value_label"] = chart_df[value_col].apply(lambda v: value_format.format(v))
 
-    # Pad the x-axis scale so labels printed past the bar end always have room
-    # and never get clipped at the right edge of the chart. Padding is generous
-    # (45%) because this chart often renders inside a narrower half-width column
-    # (side-by-side units/value layout), where clipping is more likely.
     max_val = chart_df[value_col].max()
     x_scale = alt.Scale(domain=[0, max_val * 1.45])
 
-    # Widest label in this chart determines how much left-side room to reserve —
-    # long product names (up to ~70 characters) need real width, not a fixed cap.
     longest_label_chars = chart_df["_label_full"].str.len().max()
     label_limit_px = min(max(longest_label_chars * 7, 140), 480)
 
@@ -627,12 +582,6 @@ def horizontal_bar_chart(df, label_col, value_col, accent_color, value_format="�
         align="left", dx=8, fontSize=14, fontWeight="bold", color="#1A2B3C",
     ).encode(text="_value_label:N")
 
-    # width="container" tells Vega-Lite itself to fill its parent's actual pixel
-    # width before computing the scale/layout — this is the setting Altair needs
-    # so the chart's internal coordinates match what Streamlit stretches it to.
-    # background/text colors are pinned explicitly (not inherited) so the chart
-    # always renders dark text on a light surface regardless of any surrounding
-    # theme — this is what was causing numbers/labels to disappear before.
     chart = (bars + text).properties(
         height=max(34 * len(chart_df), 140), width="container", padding={"top": 6, "right": 12, "bottom": 4, "left": 4}
     ).configure_view(strokeWidth=0, fill="#FAF8F4", clip=False).configure(
@@ -659,8 +608,6 @@ with st.sidebar:
     st.markdown("---")
     st.caption(f"MSafe Equipments Pvt Ltd · {date.today().strftime('%d %b %Y')}")
 
-# Dead Stock standard, fixed at 180+ days — the threshold directors use.
-# Age Rank: 0 = 0-60d, 1 = 60-120d, 2 = 120-180d, 3 = 180+d.
 threshold_days = 180
 dead_rank_cutoff = 3
 
@@ -696,17 +643,13 @@ if not all_dfs:
 
 master = pd.concat(all_dfs, ignore_index=True)
 
-# This report only covers items idle 120+ days. 0–60 and 60–120 day items are
-# dropped here, at the source, so they never appear in or affect any KPI,
-# chart, table, or total anywhere downstream — this isn't a display filter,
-# the data simply doesn't exist past this point.
 master = master[master["Age Rank"] >= 2].copy()
 
 if master.empty:
     st.success("No items are currently idle 120+ days across the uploaded yards.")
     st.stop()
 
-# ── Explainer strip — plain language for directors ────────────────────────────
+# ── Explainer strip ───────────────────────────────────────────────────────────
 st.markdown(f"""
 <div class="explain-box">
   <b>What you're looking at:</b> every item below is equipment that has been sitting unused
@@ -725,10 +668,7 @@ master_v = master[master["Location"].isin(sel_locs)].copy()
 master_v["Is Dead"] = master_v["Age Rank"] >= dead_rank_cutoff
 dead_v = master_v[master_v["Is Dead"]].copy()
 
-# ── KPIs ────────────────────────────────────────────────────────────────────────
-# KPI 1 — the single product that has been sitting the longest (180+ days bucket),
-# aggregated across every yard it appears in. This answers "what's our worst single
-# write-off candidate" directly, by both quantity and value.
+# ── KPIs ───────────────────────────────────────────────────────────────────────
 if len(dead_v) > 0:
     worst_product = (
         dead_v.groupby(["Item Code", "Item Name"])
@@ -754,9 +694,6 @@ dead_value_pct   = dead_value / total_idle_value * 100 if total_idle_value else 
 dead_skus        = len(dead_v)
 locs_ct          = master_v["Location"].nunique()
 
-# Cards redesigned so the number you need is the biggest, boldest thing on the
-# card every time — short plain-English label above it, one short supporting
-# line below. No long run-on labels competing with the number for attention.
 st.markdown(f"""
 <div class="kpi-row">
   <div class="kpi danger">
@@ -794,7 +731,6 @@ RAG_COLOR = {"120–180 days": "🟠", "180+ days": "🔴"}
 
 
 def render_age_band_body(band_df, band_label, band_key, accent_color):
-    """Renders: yard chart+table, then product chart+table, both units & value, high to low."""
     if len(band_df) == 0:
         st.info(f"No items fall in the {band_label.lower()} band.")
         return
@@ -816,7 +752,6 @@ def render_age_band_body(band_df, band_label, band_key, accent_color):
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Yard-wise: units and value, both high to low ───────────────────────
     st.markdown(f'<div class="chart-heading">Which yard has the most dead inventory</div>', unsafe_allow_html=True)
 
     yard_units = band_df.groupby("Location")["Idle Qty"].sum().sort_values(ascending=False)
@@ -847,7 +782,6 @@ def render_age_band_body(band_df, band_label, band_key, accent_color):
 
     st.dataframe(yard_table[["Rank", "Yard", "Units", "Value ₹"]], width="stretch", hide_index=True)
 
-    # ── Product-wise: units and value, both high to low ────────────────────
     st.markdown(f'<div class="chart-heading">Which product is dead the most</div>', unsafe_allow_html=True)
 
     prod_grp = band_df.groupby(["Item Code", "Item Name"]).agg(
@@ -879,7 +813,6 @@ def render_age_band_body(band_df, band_label, band_key, accent_color):
         width="stretch", hide_index=True
     )
 
-    # ── Download for this band ──────────────────────────────────────────────
     export_sheets = {
         f"{band_key} - By Yard": df_to_rows(yard_table[["Rank", "Yard", "Units", "Value ₹"]]),
         f"{band_key} - By Product": df_to_rows(
@@ -909,13 +842,6 @@ def _insight_card(icon, headline, body):
 
 
 def render_analysis_tab(master_v, dead_v, band_120_180, band_180_plus, threshold_days):
-    """
-    Director-facing summary: a handful of short, auto-generated written
-    takeaways pulled straight from the numbers (concentration by yard,
-    worst products, what's about to tip into Dead Stock), backed by a
-    couple of supporting charts. This is meant to be readable on its own,
-    before anyone drills into the detailed tabs.
-    """
     st.markdown('<div class="sec-title">🧭 What this data is telling us</div>', unsafe_allow_html=True)
     st.markdown('<div class="sec-sub">Auto-generated from the current upload — a starting point for discussion, not a final verdict</div>', unsafe_allow_html=True)
 
@@ -927,7 +853,6 @@ def render_analysis_tab(master_v, dead_v, band_120_180, band_180_plus, threshold
     dead_value = dead_v["Idle Value"].sum()
     n_yards = master_v["Location"].nunique()
 
-    # ── Yard concentration ──────────────────────────────────────────────────
     yard_dead_value = dead_v.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
     yard_total_value = master_v.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
 
@@ -947,7 +872,6 @@ def render_analysis_tab(master_v, dead_v, band_120_180, band_180_plus, threshold
             f"most of the write-off risk."
         )
 
-    # ── Product concentration ───────────────────────────────────────────────
     if len(dead_v) > 0:
         prod_dead = dead_v.groupby(["Item Code", "Item Name"]).agg(
             Value=("Idle Value", "sum"), Yards=("Location", "nunique")
@@ -964,7 +888,6 @@ def render_analysis_tab(master_v, dead_v, band_120_180, band_180_plus, threshold
             f"fixing a handful of SKUs would move the needle company-wide."
         )
 
-    # ── Repeat offenders across yards ───────────────────────────────────────
     if len(dead_v) > 0:
         cross = dead_v.groupby(["Item Code", "Item Name"])["Location"].nunique().reset_index(name="Yards")
         multi_yard = cross[cross["Yards"] >= 3]
@@ -977,7 +900,6 @@ def render_analysis_tab(master_v, dead_v, band_120_180, band_180_plus, threshold
                 f"See the <b>Repeat Offenders</b> tab for the full list."
             )
 
-    # ── About to tip into Dead Stock ────────────────────────────────────────
     if len(band_120_180) > 0:
         about_to_tip_value = band_120_180["Idle Value"].sum()
         about_to_tip_items = len(band_120_180)
@@ -990,7 +912,6 @@ def render_analysis_tab(master_v, dead_v, band_120_180, band_180_plus, threshold
             f"where intervention is still cheap."
         )
 
-    # ── Overall framing ─────────────────────────────────────────────────────
     dead_pct_of_total = dead_value / total_value * 100 if total_value else 0
     _insight_card(
         "💰", f"Dead Stock is {dead_pct_of_total:.0f}% of all tracked idle value",
@@ -999,7 +920,6 @@ def render_analysis_tab(master_v, dead_v, band_120_180, band_180_plus, threshold
         f"crossed the {threshold_days}-day Dead Stock line and is the most urgent to act on."
     )
 
-    # ── Supporting charts ────────────────────────────────────────────────────
     st.markdown('<div class="chart-heading">Dead Stock value by yard — where to focus first</div>', unsafe_allow_html=True)
     if len(yard_dead_value) > 0:
         chart_df = yard_dead_value.reset_index()
@@ -1022,12 +942,7 @@ def render_analysis_tab(master_v, dead_v, band_120_180, band_180_plus, threshold
 band_120_180 = master_v[master_v["Age Bucket"] == "120–180 days"].copy()
 band_180_plus = master_v[master_v["Age Bucket"] == "180+ days"].copy()
 
-# ── Top-level tabs ─────────────────────────────────────────────────────────────
-# 180+ days and 120-180 days are fully separate tabs (rather than stacked
-# sections on one long page), each followed by the By-Yard and Repeat-Offenders
-# views — so a director can stay inside one age band the whole time instead of
-# scrolling past the other one to get there. Analysis sits first since it's the
-# single-screen takeaway a director would want before drilling into detail.
+# ── Tabs ───────────────────────────────────────────────────────────────────────
 tab_analysis, tab_180, tab_120, tab_byyard, tab_repeat = st.tabs([
     "🧭 Analysis", "🔴 180+ Days — Dead Stock", "🟠 120–180 Days — Needs Action",
     "🏭 By Yard (All Bands)", "🔁 Repeat Offenders (All Bands)"
@@ -1046,10 +961,6 @@ with tab_120:
     st.markdown('<div class="sec-sub">About to cross into Dead Stock — the window to act is closing</div>', unsafe_allow_html=True)
     render_age_band_body(band_120_180, "120–180 Days — Needs Action", "120-180days", "#C8923A")
 
-
-# ══════════════════════════════════════════════
-# TAB — By Yard
-# ══════════════════════════════════════════════
 with tab_byyard:
     st.markdown('<div class="sec-title">Dead stock, yard by yard</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="sec-sub">Worst yards first — based on the {threshold_days}-day cutoff</div>', unsafe_allow_html=True)
@@ -1092,10 +1003,6 @@ with tab_byyard:
                     width="stretch", hide_index=True
                 )
 
-
-# ══════════════════════════════════════════════
-# TAB — Repeat Offenders (multi-yard dead items)
-# ══════════════════════════════════════════════
 with tab_repeat:
     st.markdown('<div class="sec-title">Items dead in many yards at once</div>', unsafe_allow_html=True)
     st.markdown('<div class="sec-sub">These point to a company-wide issue with the item — not just one yard\'s problem</div>', unsafe_allow_html=True)
