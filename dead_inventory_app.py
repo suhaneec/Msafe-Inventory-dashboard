@@ -654,7 +654,7 @@ with st.sidebar:
         "Upload inventory file",
         type=["xlsx"],
         accept_multiple_files=True,
-        help="ERP export of stock not moved in 60+ days. One tab per yard, or separate files per yard."
+        help="ERP export of stock not moved in 60+ days. This dashboard reports on the 120+ day subset only. One tab per yard, or separate files per yard."
     )
     st.markdown("---")
     st.caption(f"MSafe Equipments Pvt Ltd · {date.today().strftime('%d %b %Y')}")
@@ -678,7 +678,7 @@ if not uploaded:
                 padding:2.5rem;text-align:center;color:#888;font-size:0.85rem;">
         <b>Upload the ERP non-moving stock file in the sidebar to begin.</b><br><br>
         This file already contains only equipment that hasn't moved in 60+ days —<br>
-        one tab per yard, or separate files per yard, both work.
+        this dashboard reports on the 120+ day subset · one tab per yard, or separate files per yard.
     </div>
     """, unsafe_allow_html=True)
     st.stop()
@@ -696,12 +696,22 @@ if not all_dfs:
 
 master = pd.concat(all_dfs, ignore_index=True)
 
+# This report only covers items idle 120+ days. 0–60 and 60–120 day items are
+# dropped here, at the source, so they never appear in or affect any KPI,
+# chart, table, or total anywhere downstream — this isn't a display filter,
+# the data simply doesn't exist past this point.
+master = master[master["Age Rank"] >= 2].copy()
+
+if master.empty:
+    st.success("No items are currently idle 120+ days across the uploaded yards.")
+    st.stop()
+
 # ── Explainer strip — plain language for directors ────────────────────────────
 st.markdown(f"""
 <div class="explain-box">
   <b>What you're looking at:</b> every item below is equipment that has been sitting unused
-  for at least 60 days — it isn't earning rental income. The longer it sits, the more it's
-  costing us in locked-up capital. Anything idle <b>{threshold_days}+ days</b> is counted as
+  for at least <b>120 days</b> — it isn't earning rental income. The longer it sits, the more
+  it's costing us in locked-up capital. Anything idle <b>{threshold_days}+ days</b> is counted as
   <b>"Dead Stock"</b> — money tied up with no return. This is the company-wide standard used
   throughout this report.
 </div>
@@ -760,9 +770,9 @@ st.markdown(f"""
     <div class="sub"><b>{dead_skus} items</b> · {dead_qty:,} units · {dead_value_pct:.0f}% of all non-moving stock</div>
   </div>
   <div class="kpi warn">
-    <div class="lbl">Total non-moving stock value</div>
+    <div class="lbl">Total stock idle 120+ days</div>
     <div class="val">₹{total_idle_value/100000:.1f}L</div>
-    <div class="sub"><b>{total_idle_qty:,} units</b> · all age bands combined (0–60d → 180+d)</div>
+    <div class="sub"><b>{total_idle_qty:,} units</b> · 120–180d + 180+d combined</div>
   </div>
   <div class="kpi neutral">
     <div class="lbl">Yards reviewed</div>
@@ -775,14 +785,12 @@ st.markdown(f"""
 # ── Severity legend ────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="legend-row">
-  <span class="chip c-green"><span class="dot c-green"></span>0–60 days — Just starting to slow</span>
-  <span class="chip c-yellow"><span class="dot c-yellow"></span>60–120 days — Worth watching</span>
   <span class="chip c-orange"><span class="dot c-orange"></span>120–180 days — Needs action</span>
   <span class="chip c-red"><span class="dot c-red"></span>180+ days — Dead stock</span>
 </div>
 """, unsafe_allow_html=True)
 
-RAG_COLOR = {"0–60 days": "🟢", "60–120 days": "🟡", "120–180 days": "🟠", "180+ days": "🔴"}
+RAG_COLOR = {"120–180 days": "🟠", "180+ days": "🔴"}
 
 
 def render_age_band_body(band_df, band_label, band_key, accent_color):
@@ -888,18 +896,145 @@ def render_age_band_body(band_df, band_label, band_key, accent_color):
     )
 
 
+def _insight_card(icon, headline, body):
+    st.markdown(f"""
+    <div style="background:#fff; border:1px solid #E5E0D8; border-left:4px solid #B5562B;
+                border-radius:10px; padding:1rem 1.2rem; margin-bottom:0.8rem;">
+      <div style="font-family:'Fraunces',serif; font-weight:700; font-size:1rem; color:#1A2B3C; margin-bottom:4px;">
+        {icon} {headline}
+      </div>
+      <div style="font-size:0.86rem; color:#3A3530; line-height:1.5;">{body}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_analysis_tab(master_v, dead_v, band_120_180, band_180_plus, threshold_days):
+    """
+    Director-facing summary: a handful of short, auto-generated written
+    takeaways pulled straight from the numbers (concentration by yard,
+    worst products, what's about to tip into Dead Stock), backed by a
+    couple of supporting charts. This is meant to be readable on its own,
+    before anyone drills into the detailed tabs.
+    """
+    st.markdown('<div class="sec-title">🧭 What this data is telling us</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">Auto-generated from the current upload — a starting point for discussion, not a final verdict</div>', unsafe_allow_html=True)
+
+    if len(master_v) == 0:
+        st.info("No 120+ day idle stock in the current selection.")
+        return
+
+    total_value = master_v["Idle Value"].sum()
+    dead_value = dead_v["Idle Value"].sum()
+    n_yards = master_v["Location"].nunique()
+
+    # ── Yard concentration ──────────────────────────────────────────────────
+    yard_dead_value = dead_v.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
+    yard_total_value = master_v.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
+
+    if len(yard_dead_value) > 0:
+        top_yard = yard_dead_value.index[0]
+        top_yard_value = yard_dead_value.iloc[0]
+        top_yard_pct = top_yard_value / dead_value * 100 if dead_value else 0
+        top3_pct = yard_dead_value.head(3).sum() / dead_value * 100 if dead_value else 0
+        n_yards_with_dead = (yard_dead_value > 0).sum()
+
+        _insight_card(
+            "🏭", f"{top_yard} is the single biggest concentration of dead stock",
+            f"It alone accounts for <b>₹{top_yard_value/100000:.1f}L</b> — "
+            f"<b>{top_yard_pct:.0f}%</b> of all Dead Stock value across "
+            f"{n_yards_with_dead} affected yards. The top 3 yards together hold "
+            f"<b>{top3_pct:.0f}%</b> of it, so a small number of locations are driving "
+            f"most of the write-off risk."
+        )
+
+    # ── Product concentration ───────────────────────────────────────────────
+    if len(dead_v) > 0:
+        prod_dead = dead_v.groupby(["Item Code", "Item Name"]).agg(
+            Value=("Idle Value", "sum"), Yards=("Location", "nunique")
+        ).reset_index().sort_values("Value", ascending=False)
+        top_prod = prod_dead.iloc[0]
+        top_prod_pct = top_prod["Value"] / dead_value * 100 if dead_value else 0
+        top5_prod_pct = prod_dead.head(5)["Value"].sum() / dead_value * 100 if dead_value else 0
+
+        _insight_card(
+            "📦", f"{top_prod['Item Name']} is the single worst product by value",
+            f"It's responsible for <b>₹{top_prod['Value']:,.0f}</b> of Dead Stock on its own, "
+            f"sitting idle across <b>{int(top_prod['Yards'])} yard(s)</b>. The 5 worst products "
+            f"together account for <b>{top5_prod_pct:.0f}%</b> of all Dead Stock value — "
+            f"fixing a handful of SKUs would move the needle company-wide."
+        )
+
+    # ── Repeat offenders across yards ───────────────────────────────────────
+    if len(dead_v) > 0:
+        cross = dead_v.groupby(["Item Code", "Item Name"])["Location"].nunique().reset_index(name="Yards")
+        multi_yard = cross[cross["Yards"] >= 3]
+        if len(multi_yard) > 0:
+            _insight_card(
+                "🔁", f"{len(multi_yard)} products are dead in 3+ yards simultaneously",
+                f"When the same item is dead stock in multiple yards at once, it's rarely a "
+                f"local problem — it usually points to overstocking, weak demand, or a sourcing "
+                f"decision that needs a company-wide call rather than yard-by-yard fixes. "
+                f"See the <b>Repeat Offenders</b> tab for the full list."
+            )
+
+    # ── About to tip into Dead Stock ────────────────────────────────────────
+    if len(band_120_180) > 0:
+        about_to_tip_value = band_120_180["Idle Value"].sum()
+        about_to_tip_items = len(band_120_180)
+        pct_of_total = about_to_tip_value / total_value * 100 if total_value else 0
+        _insight_card(
+            "⏳", f"₹{about_to_tip_value/100000:.1f}L is one step away from becoming Dead Stock",
+            f"<b>{about_to_tip_items} items</b> are currently in the 120–180 day band "
+            f"({pct_of_total:.0f}% of total tracked value). Without action in the next 1–2 months, "
+            f"this moves into the {threshold_days}+ day Dead Stock category — this is the window "
+            f"where intervention is still cheap."
+        )
+
+    # ── Overall framing ─────────────────────────────────────────────────────
+    dead_pct_of_total = dead_value / total_value * 100 if total_value else 0
+    _insight_card(
+        "💰", f"Dead Stock is {dead_pct_of_total:.0f}% of all tracked idle value",
+        f"Across <b>{n_yards} yards</b>, <b>₹{total_value/100000:.1f}L</b> is currently tied up "
+        f"in equipment idle 120+ days. Of that, <b>₹{dead_value/100000:.1f}L</b> has already "
+        f"crossed the {threshold_days}-day Dead Stock line and is the most urgent to act on."
+    )
+
+    # ── Supporting charts ────────────────────────────────────────────────────
+    st.markdown('<div class="chart-heading">Dead Stock value by yard — where to focus first</div>', unsafe_allow_html=True)
+    if len(yard_dead_value) > 0:
+        chart_df = yard_dead_value.reset_index()
+        chart_df.columns = ["Yard", "Value"]
+        horizontal_bar_chart(chart_df, "Yard", "Value", "#B5562B", value_format="₹{:,.0f}")
+    else:
+        st.info("No Dead Stock (180+ days) in the current selection.")
+
+    st.markdown('<div class="chart-heading">Top 10 worst products by Dead Stock value</div>', unsafe_allow_html=True)
+    if len(dead_v) > 0:
+        top_prods_chart = (
+            dead_v.groupby(["Item Code", "Item Name"])["Idle Value"].sum()
+            .sort_values(ascending=False).head(10).reset_index()
+        )
+        horizontal_bar_chart(top_prods_chart, "Item Name", "Idle Value", "#B5562B", value_format="₹{:,.0f}")
+    else:
+        st.info("No Dead Stock (180+ days) in the current selection.")
+
+
 band_120_180 = master_v[master_v["Age Bucket"] == "120–180 days"].copy()
 band_180_plus = master_v[master_v["Age Bucket"] == "180+ days"].copy()
 
 # ── Top-level tabs ─────────────────────────────────────────────────────────────
-# 180+ days and 120-180 days are now fully separate tabs (rather than stacked
+# 180+ days and 120-180 days are fully separate tabs (rather than stacked
 # sections on one long page), each followed by the By-Yard and Repeat-Offenders
-# views scoped to that same age band — so a director can stay inside one age
-# band the whole time instead of scrolling past the other one to get there.
-tab_180, tab_120, tab_byyard, tab_repeat = st.tabs([
-    "🔴 180+ Days — Dead Stock", "🟠 120–180 Days — Needs Action",
+# views — so a director can stay inside one age band the whole time instead of
+# scrolling past the other one to get there. Analysis sits first since it's the
+# single-screen takeaway a director would want before drilling into detail.
+tab_analysis, tab_180, tab_120, tab_byyard, tab_repeat = st.tabs([
+    "🧭 Analysis", "🔴 180+ Days — Dead Stock", "🟠 120–180 Days — Needs Action",
     "🏭 By Yard (All Bands)", "🔁 Repeat Offenders (All Bands)"
 ])
+
+with tab_analysis:
+    render_analysis_tab(master_v, dead_v, band_120_180, band_180_plus, threshold_days)
 
 with tab_180:
     st.markdown('<div class="sec-title">🔴 180+ Days — Dead Stock</div>', unsafe_allow_html=True)
