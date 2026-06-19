@@ -70,7 +70,6 @@ html, body { background-color: #FFFFFF !important; }
 
 [data-testid="stDataFrame"] { background-color: #FFFFFF !important; }
 [data-testid="stDataFrame"] * { color: #1A2B3C !important; }
-
 [data-testid="stDataFrame"] [data-testid="stDataFrameResizable"] {
     background-color: #FFFFFF !important;
 }
@@ -78,22 +77,36 @@ html, body { background-color: #FFFFFF !important; }
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 header[data-testid="stHeader"] { display: none; }
 
-/* ── Sidebar collapse/expand toggle button ──────────────────────────────────
-   When the sidebar is collapsed the toggle arrow sits on a white background
-   and becomes invisible. Force it to a high-contrast dark pill so directors
-   can always see and click it to open the filters pane. */
-[data-testid="collapsedControl"] {
+/* ── Sidebar toggle — nuclear option: every possible selector Streamlit
+   has ever used for the collapse/expand chevron button, across all
+   versions from 1.20 to 1.35+. One of these will always match. ────── */
+[data-testid="collapsedControl"],
+[data-testid="baseButton-headerNoPadding"],
+button[kind="header"],
+.st-emotion-cache-1dp5vir,
+section[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapsedControl"] {
     background-color: #1A2B3C !important;
     border-radius: 0 8px 8px 0 !important;
-    padding: 0.5rem 0.4rem !important;
-    box-shadow: 2px 2px 6px rgba(0,0,0,0.18) !important;
+    width: 2rem !important;
+    min-height: 3rem !important;
+    box-shadow: 3px 0 8px rgba(0,0,0,0.25) !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
-[data-testid="collapsedControl"] svg {
+[data-testid="collapsedControl"] svg,
+[data-testid="baseButton-headerNoPadding"] svg,
+[data-testid="stSidebarCollapsedControl"] svg,
+button[kind="header"] svg {
     fill: #FFFFFF !important;
     stroke: #FFFFFF !important;
     color: #FFFFFF !important;
 }
-[data-testid="collapsedControl"]:hover {
+[data-testid="collapsedControl"]:hover,
+[data-testid="stSidebarCollapsedControl"]:hover,
+button[kind="header"]:hover {
     background-color: #B5562B !important;
 }
 
@@ -240,7 +253,6 @@ section[data-testid="stSidebar"] {
 section[data-testid="stSidebar"] * { color: #C7CDD3 !important; }
 section[data-testid="stSidebar"] h2,
 section[data-testid="stSidebar"] h3 { color: #fff !important; font-family: 'Fraunces', serif; font-size: 1rem; }
-
 section[data-testid="stSidebar"] [data-baseweb="select"] > div {
     background-color: #243648 !important;
     color: #fff !important;
@@ -282,6 +294,68 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
 [data-testid="stExpander"] summary { color: #1A2B3C !important; }
 </style>
 """, unsafe_allow_html=True)
+
+# ── JS: force sidebar toggle button visible regardless of Streamlit version ────
+# Polls every 300ms until it finds the button, then styles it permanently.
+# This is the only reliable cross-version approach since Streamlit changes
+# the data-testid and class names of this button between minor releases.
+st.components.v1.html("""
+<script>
+(function() {
+  function styleToggle() {
+    // All known selectors across Streamlit versions
+    var selectors = [
+      '[data-testid="collapsedControl"]',
+      '[data-testid="stSidebarCollapsedControl"]',
+      'button[data-testid="baseButton-headerNoPadding"]',
+      'section[data-testid="stSidebar"] ~ div button',
+      '.st-emotion-cache-1dp5vir',
+    ];
+    var found = false;
+    for (var i = 0; i < selectors.length; i++) {
+      // Search in parent document (this script runs inside an iframe)
+      var els = window.parent.document.querySelectorAll(selectors[i]);
+      for (var j = 0; j < els.length; j++) {
+        var el = els[j];
+        // Only target the actual toggle (it contains a chevron SVG, small button)
+        if (el.querySelector('svg') || el.tagName === 'BUTTON') {
+          el.style.setProperty('background-color', '#1A2B3C', 'important');
+          el.style.setProperty('border-radius', '0 8px 8px 0', 'important');
+          el.style.setProperty('min-width', '2rem', 'important');
+          el.style.setProperty('min-height', '3rem', 'important');
+          el.style.setProperty('box-shadow', '3px 2px 8px rgba(0,0,0,0.3)', 'important');
+          el.style.setProperty('border', 'none', 'important');
+          var svgs = el.querySelectorAll('svg, path');
+          for (var k = 0; k < svgs.length; k++) {
+            svgs[k].style.setProperty('fill', '#ffffff', 'important');
+            svgs[k].style.setProperty('stroke', '#ffffff', 'important');
+            svgs[k].style.setProperty('color', '#ffffff', 'important');
+          }
+          el.addEventListener('mouseenter', function() {
+            this.style.setProperty('background-color', '#B5562B', 'important');
+          });
+          el.addEventListener('mouseleave', function() {
+            this.style.setProperty('background-color', '#1A2B3C', 'important');
+          });
+          found = true;
+        }
+      }
+    }
+    return found;
+  }
+
+  // Try immediately, then keep retrying every 300ms for up to 10 seconds
+  // (Streamlit renders async so the button may not exist on first run)
+  var attempts = 0;
+  var interval = setInterval(function() {
+    attempts++;
+    if (styleToggle() || attempts > 33) {
+      clearInterval(interval);
+    }
+  }, 300);
+})();
+</script>
+""", height=0)
 
 
 # ── Pure stdlib xlsx reader ────────────────────────────────────────────────────
@@ -583,7 +657,8 @@ def horizontal_bar_chart(df, label_col, value_col, accent_color, value_format="�
     ).encode(text="_value_label:N")
 
     chart = (bars + text).properties(
-        height=max(34 * len(chart_df), 140), width="container", padding={"top": 6, "right": 12, "bottom": 4, "left": 4}
+        height=max(34 * len(chart_df), 140), width="container",
+        padding={"top": 6, "right": 12, "bottom": 4, "left": 4}
     ).configure_view(strokeWidth=0, fill="#FAF8F4", clip=False).configure(
         background="#FAF8F4"
     ).configure_axis(
@@ -603,7 +678,7 @@ with st.sidebar:
         "Upload inventory file",
         type=["xlsx"],
         accept_multiple_files=True,
-        help="ERP export of stock not moved in 60+ days. This dashboard reports on the 120+ day subset only. One tab per yard, or separate files per yard."
+        help="ERP export of stock not moved in 60+ days. This dashboard reports on the 120+ day subset only."
     )
     st.markdown("---")
     st.caption(f"MSafe Equipments Pvt Ltd · {date.today().strftime('%d %b %Y')}")
@@ -642,14 +717,12 @@ if not all_dfs:
     st.stop()
 
 master = pd.concat(all_dfs, ignore_index=True)
-
 master = master[master["Age Rank"] >= 2].copy()
 
 if master.empty:
     st.success("No items are currently idle 120+ days across the uploaded yards.")
     st.stop()
 
-# ── Explainer strip ───────────────────────────────────────────────────────────
 st.markdown(f"""
 <div class="explain-box">
   <b>What you're looking at:</b> every item below is equipment that has been sitting unused
@@ -660,7 +733,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Location filter ────────────────────────────────────────────────────────────
 all_locs = sorted(master["Location"].unique())
 sel_locs = st.sidebar.multiselect("Filter yards", all_locs, default=all_locs)
 master_v = master[master["Location"].isin(sel_locs)].copy()
@@ -719,7 +791,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Severity legend ────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="legend-row">
   <span class="chip c-orange"><span class="dot c-orange"></span>120–180 days — Needs action</span>
@@ -752,7 +823,7 @@ def render_age_band_body(band_df, band_label, band_key, accent_color):
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown(f'<div class="chart-heading">Which yard has the most dead inventory</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-heading">Which yard has the most dead inventory</div>', unsafe_allow_html=True)
 
     yard_units = band_df.groupby("Location")["Idle Qty"].sum().sort_values(ascending=False)
     yard_value = band_df.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
@@ -782,7 +853,7 @@ def render_age_band_body(band_df, band_label, band_key, accent_color):
 
     st.dataframe(yard_table[["Rank", "Yard", "Units", "Value ₹"]], width="stretch", hide_index=True)
 
-    st.markdown(f'<div class="chart-heading">Which product is dead the most</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-heading">Which product is dead the most</div>', unsafe_allow_html=True)
 
     prod_grp = band_df.groupby(["Item Code", "Item Name"]).agg(
         Units=("Idle Qty", "sum"),
@@ -833,7 +904,8 @@ def _insight_card(icon, headline, body):
     st.markdown(f"""
     <div style="background:#fff; border:1px solid #E5E0D8; border-left:4px solid #B5562B;
                 border-radius:10px; padding:1rem 1.2rem; margin-bottom:0.8rem;">
-      <div style="font-family:'Fraunces',serif; font-weight:700; font-size:1rem; color:#1A2B3C; margin-bottom:4px;">
+      <div style="font-family:'Fraunces',serif; font-weight:700; font-size:1rem;
+                  color:#1A2B3C; margin-bottom:4px;">
         {icon} {headline}
       </div>
       <div style="font-size:0.86rem; color:#3A3530; line-height:1.5;">{body}</div>
@@ -850,74 +922,67 @@ def render_analysis_tab(master_v, dead_v, band_120_180, band_180_plus, threshold
         return
 
     total_value = master_v["Idle Value"].sum()
-    dead_value = dead_v["Idle Value"].sum()
-    n_yards = master_v["Location"].nunique()
+    dead_value  = dead_v["Idle Value"].sum()
+    n_yards     = master_v["Location"].nunique()
 
-    yard_dead_value = dead_v.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
+    yard_dead_value  = dead_v.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
     yard_total_value = master_v.groupby("Location")["Idle Value"].sum().sort_values(ascending=False)
 
     if len(yard_dead_value) > 0:
-        top_yard = yard_dead_value.index[0]
+        top_yard       = yard_dead_value.index[0]
         top_yard_value = yard_dead_value.iloc[0]
-        top_yard_pct = top_yard_value / dead_value * 100 if dead_value else 0
-        top3_pct = yard_dead_value.head(3).sum() / dead_value * 100 if dead_value else 0
+        top_yard_pct   = top_yard_value / dead_value * 100 if dead_value else 0
+        top3_pct       = yard_dead_value.head(3).sum() / dead_value * 100 if dead_value else 0
         n_yards_with_dead = (yard_dead_value > 0).sum()
-
         _insight_card(
             "🏭", f"{top_yard} is the single biggest concentration of dead stock",
             f"It alone accounts for <b>₹{top_yard_value/100000:.1f}L</b> — "
             f"<b>{top_yard_pct:.0f}%</b> of all Dead Stock value across "
             f"{n_yards_with_dead} affected yards. The top 3 yards together hold "
-            f"<b>{top3_pct:.0f}%</b> of it, so a small number of locations are driving "
-            f"most of the write-off risk."
+            f"<b>{top3_pct:.0f}%</b> of it."
         )
 
     if len(dead_v) > 0:
         prod_dead = dead_v.groupby(["Item Code", "Item Name"]).agg(
             Value=("Idle Value", "sum"), Yards=("Location", "nunique")
         ).reset_index().sort_values("Value", ascending=False)
-        top_prod = prod_dead.iloc[0]
-        top_prod_pct = top_prod["Value"] / dead_value * 100 if dead_value else 0
+        top_prod      = prod_dead.iloc[0]
         top5_prod_pct = prod_dead.head(5)["Value"].sum() / dead_value * 100 if dead_value else 0
-
         _insight_card(
             "📦", f"{top_prod['Item Name']} is the single worst product by value",
-            f"It's responsible for <b>₹{top_prod['Value']:,.0f}</b> of Dead Stock on its own, "
-            f"sitting idle across <b>{int(top_prod['Yards'])} yard(s)</b>. The 5 worst products "
-            f"together account for <b>{top5_prod_pct:.0f}%</b> of all Dead Stock value — "
-            f"fixing a handful of SKUs would move the needle company-wide."
+            f"Responsible for <b>₹{top_prod['Value']:,.0f}</b> of Dead Stock, sitting idle across "
+            f"<b>{int(top_prod['Yards'])} yard(s)</b>. Top 5 products together = "
+            f"<b>{top5_prod_pct:.0f}%</b> of all Dead Stock value."
         )
 
     if len(dead_v) > 0:
-        cross = dead_v.groupby(["Item Code", "Item Name"])["Location"].nunique().reset_index(name="Yards")
+        cross      = dead_v.groupby(["Item Code", "Item Name"])["Location"].nunique().reset_index(name="Yards")
         multi_yard = cross[cross["Yards"] >= 3]
         if len(multi_yard) > 0:
             _insight_card(
                 "🔁", f"{len(multi_yard)} products are dead in 3+ yards simultaneously",
-                f"When the same item is dead stock in multiple yards at once, it's rarely a "
-                f"local problem — it usually points to overstocking, weak demand, or a sourcing "
-                f"decision that needs a company-wide call rather than yard-by-yard fixes. "
-                f"See the <b>Repeat Offenders</b> tab for the full list."
+                "When the same item is dead in multiple yards, it's rarely a local problem — "
+                "it usually points to overstocking or weak demand company-wide. "
+                "See the <b>Repeat Offenders</b> tab."
             )
 
     if len(band_120_180) > 0:
-        about_to_tip_value = band_120_180["Idle Value"].sum()
-        about_to_tip_items = len(band_120_180)
-        pct_of_total = about_to_tip_value / total_value * 100 if total_value else 0
+        tip_value = band_120_180["Idle Value"].sum()
+        tip_items = len(band_120_180)
+        tip_pct   = tip_value / total_value * 100 if total_value else 0
         _insight_card(
-            "⏳", f"₹{about_to_tip_value/100000:.1f}L is one step away from becoming Dead Stock",
-            f"<b>{about_to_tip_items} items</b> are currently in the 120–180 day band "
-            f"({pct_of_total:.0f}% of total tracked value). Without action in the next 1–2 months, "
-            f"this moves into the {threshold_days}+ day Dead Stock category — this is the window "
-            f"where intervention is still cheap."
+            "⏳", f"₹{tip_value/100000:.1f}L is one step away from becoming Dead Stock",
+            f"<b>{tip_items} items</b> are in the 120–180 day band ({tip_pct:.0f}% of total "
+            f"tracked value). Without action in the next 1–2 months, this crosses the "
+            f"{threshold_days}-day line."
         )
 
     dead_pct_of_total = dead_value / total_value * 100 if total_value else 0
     _insight_card(
         "💰", f"Dead Stock is {dead_pct_of_total:.0f}% of all tracked idle value",
-        f"Across <b>{n_yards} yards</b>, <b>₹{total_value/100000:.1f}L</b> is currently tied up "
-        f"in equipment idle 120+ days. Of that, <b>₹{dead_value/100000:.1f}L</b> has already "
-        f"crossed the {threshold_days}-day Dead Stock line and is the most urgent to act on."
+        f"Across <b>{n_yards} yards</b>, <b>₹{total_value/100000:.1f}L</b> is tied up in "
+        f"equipment idle 120+ days. Of that, <b>₹{dead_value/100000:.1f}L</b> has already "
+        f"crossed the {threshold_days}-day Dead Stock line."
     )
 
     st.markdown('<div class="chart-heading">Dead Stock value by yard — where to focus first</div>', unsafe_allow_html=True)
@@ -939,10 +1004,9 @@ def render_analysis_tab(master_v, dead_v, band_120_180, band_180_plus, threshold
         st.info("No Dead Stock (180+ days) in the current selection.")
 
 
-band_120_180 = master_v[master_v["Age Bucket"] == "120–180 days"].copy()
+band_120_180  = master_v[master_v["Age Bucket"] == "120–180 days"].copy()
 band_180_plus = master_v[master_v["Age Bucket"] == "180+ days"].copy()
 
-# ── Tabs ───────────────────────────────────────────────────────────────────────
 tab_analysis, tab_180, tab_120, tab_byyard, tab_repeat = st.tabs([
     "🧭 Analysis", "🔴 180+ Days — Dead Stock", "🟠 120–180 Days — Needs Action",
     "🏭 By Yard (All Bands)", "🔁 Repeat Offenders (All Bands)"
@@ -953,7 +1017,7 @@ with tab_analysis:
 
 with tab_180:
     st.markdown('<div class="sec-title">🔴 180+ Days — Dead Stock</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">Money tied up the longest, with no return — the company-wide write-off candidates</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">Money tied up the longest — company-wide write-off candidates</div>', unsafe_allow_html=True)
     render_age_band_body(band_180_plus, "180+ Days — Dead Stock", "180plusdays", "#B5562B")
 
 with tab_120:
@@ -973,7 +1037,7 @@ with tab_byyard:
             Qty=("Idle Qty", "sum"),
             Value=("Idle Value", "sum"),
         ).reset_index()
-        loc_all = master_v.groupby("Location").agg(All_Items=("Item Code", "count")).reset_index()
+        loc_all  = master_v.groupby("Location").agg(All_Items=("Item Code", "count")).reset_index()
         loc_dead = loc_dead.merge(loc_all, on="Location")
         loc_dead["% of yard's idle items"] = (loc_dead["Items"] / loc_dead["All_Items"] * 100).round(0)
         loc_dead = loc_dead.sort_values("Value", ascending=False)
@@ -990,10 +1054,14 @@ with tab_byyard:
         )
 
         st.markdown('<div class="sec-title">Item-level detail per yard</div>', unsafe_allow_html=True)
-
         for loc in loc_dead["Location"]:
-            loc_df = dead_v[dead_v["Location"] == loc].sort_values(["Age Rank", "Idle Value"], ascending=[False, False])
-            with st.expander(f"📍 {loc}  —  {len(loc_df)} dead items  ·  ₹{loc_df['Idle Value'].sum():,.0f}", expanded=False):
+            loc_df = dead_v[dead_v["Location"] == loc].sort_values(
+                ["Age Rank", "Idle Value"], ascending=[False, False]
+            )
+            with st.expander(
+                f"📍 {loc}  —  {len(loc_df)} dead items  ·  ₹{loc_df['Idle Value'].sum():,.0f}",
+                expanded=False
+            ):
                 show = loc_df[["Item Code", "Item Name", "Age Bucket", "Idle Qty", "Idle Value"]].copy()
                 show["RAG"] = show["Age Bucket"].map(RAG_COLOR)
                 show["Idle Value"] = show["Idle Value"].apply(lambda x: f"₹{x:,.0f}")
@@ -1005,7 +1073,7 @@ with tab_byyard:
 
 with tab_repeat:
     st.markdown('<div class="sec-title">Items dead in many yards at once</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sec-sub">These point to a company-wide issue with the item — not just one yard\'s problem</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-sub">These point to a company-wide issue — not just one yard\'s problem</div>', unsafe_allow_html=True)
 
     if len(dead_v) == 0:
         st.success("No dead stock at the current threshold.")
@@ -1022,12 +1090,11 @@ with tab_repeat:
             st.markdown(f"""
             <div class="alert-box">
               <b>{len(multi)} items</b> are dead stock in <b>3 or more yards at the same time.</b>
-              This usually means the item itself is overstocked or losing demand company-wide —
-              worth reviewing centrally rather than yard by yard.
+              Worth reviewing centrally rather than yard by yard.
             </div>
             """, unsafe_allow_html=True)
 
-        cross["RAG"] = cross["Yards"].apply(lambda x: "🔴" if x >= 5 else ("🟠" if x >= 3 else "🟡"))
+        cross["RAG"]     = cross["Yards"].apply(lambda x: "🔴" if x >= 5 else ("🟠" if x >= 3 else "🟡"))
         cross["Value ₹"] = cross["Value"].apply(lambda x: f"₹{x:,.0f}")
 
         st.dataframe(
@@ -1037,7 +1104,11 @@ with tab_repeat:
             width="stretch", hide_index=True
         )
 
-        export_sheets2 = {"Repeat Offenders": df_to_rows(cross[["Item Code","Item Name","Yards","Yard_List","Qty","Value"]])}
+        export_sheets2 = {
+            "Repeat Offenders": df_to_rows(
+                cross[["Item Code", "Item Name", "Yards", "Yard_List", "Qty", "Value"]]
+            )
+        }
         buf2 = write_xlsx_stdlib(export_sheets2)
         st.download_button(
             "⬇️  Download this list (.xlsx)",
